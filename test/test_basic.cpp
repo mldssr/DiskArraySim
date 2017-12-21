@@ -10,9 +10,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <assert.h>
 
 #include "utils/basic.h"
+
+static void test_MAX() {
+    double a = 1.3, b = 2.6;
+    double c = MAX(a, b);
+    assert(c == b);
+    printf("MAX of %f and %f is %f\n", a, b, c);
+    printf("Test MAX passed!\n");
+}
 
 static void test_stradd() {
     char *get;
@@ -101,7 +110,34 @@ static void test_strreplace() {
     printf("Test strreplace passed!\n");
 }
 
+static void test_str2hex() {
+    const char *str = "0123";
+    char *get = str2hex(str, 1);
+    assert(strcmp(get, "30") == 0);
+    delete get;
+
+    get = str2hex(str, 4);
+    assert(strcmp(get, "30313233") == 0);
+    delete get;
+
+    printf("Test str2hex passed!\n");
+}
+
+static void test_time() {
+    char buf[20];
+    strcpy(buf, "2017-12-20T23:33:59");
+    buf[10] = ' ';
+    time_t time = str2time_t(buf);
+//    printf("Convert str to time_t: %lld\n", time);
+
+    char time_buf[20];
+    time_t2str(time, time_buf, 20);
+    assert(strcmp(buf, time_buf) == 0);
+    printf("Test time passed!\n");
+}
+
 int main(int argc, char **argv) {
+    test_MAX();
     test_stradd();
     test_strbase();
     test_strext();
@@ -109,6 +145,8 @@ int main(int argc, char **argv) {
     test_strtrim();
     test_strfit();
     test_strreplace();
+    test_str2hex();
+    test_time();
 
     return 0;
 }

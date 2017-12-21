@@ -34,7 +34,7 @@ public:
     /* 写入文件。从data中读取count个大小为size的数据写入到文件中。 */
     void write(const void *data, size_t size, size_t count);
     /* 从文件读取数据。 */
-    void scan(const char *msg, ...);
+    int scan(const char *msg, ...);
     /* 写入文件。 */
     void print(const char *msg, ...);
     /* 写入文件。 */

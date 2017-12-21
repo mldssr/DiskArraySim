@@ -15,7 +15,7 @@
 
 static int test_log()
 {
-    int num = 2;
+    int num = 100;
     char str[] = "III";
 
     log.debug("Frist entry of the log!");
@@ -42,6 +42,7 @@ int main(int argc, char **argv)
     printf("Test Log.\n");
     /* test the routine log writing. */
     assert(test_log() == 0);
+    test_log();
 
     printf("All tests passed!\n");
     return 0;

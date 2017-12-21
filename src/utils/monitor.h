@@ -24,7 +24,8 @@ public:
     ~Monitor();
 
     /* 监控特定文件夹下的文件，文件名可用*.ext表示。 */
-    void set(const char *path, const char *pattern, notify_t notify, void *params);
+    void set(const char *path, const char *pattern, notify_t notify,
+            void *params);
 
     /* 对当前文件中的现有文件进行操作。 */
     void walk(notify_t notify, void *params);

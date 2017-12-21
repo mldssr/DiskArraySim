@@ -39,6 +39,7 @@ int test_file(char *filename) {
     return 0;
 }
 
+// $(BUILD)test_file $(BUILD)tmpfile
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Need a parameter of filename!");

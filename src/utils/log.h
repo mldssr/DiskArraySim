@@ -16,12 +16,14 @@ const int DEBUG_LEVEL = 1;
 const int INFO_LEVEL = 2;
 /* 日志级别：错误信息。 */
 const int ERROR_LEVEL = 4;
+/* 日志级别：同时打印到控制台。 */
+const int CONSOLE_LEVEL = 8;
 
 class Log {
 private:
     char *_dir;             // 日志文件保存的文件夹
-    char *_logfile;         // 日志文件名
-
+    char *_logfile;         // 日志文件名，_dir/20171209.log
+    File *_logfp;           // 日志文件描述符
     int _this_day;          // 日志文件的当前日期
     int _level;             // 日志的保存级别
 

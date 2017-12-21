@@ -19,14 +19,21 @@
 Log::Log() {
     _dir = NULL;
     _logfile = NULL;
-    _level = 7;
+    _logfp = NULL;
+    _level = 15;
     _this_day = 0;
 }
 
 Log::~Log() {
     info("[LOG] Close the log by PID: %d.", getpid());
-    if (_dir) delete _dir;
-    if (_logfile) delete _logfile;
+    if (_dir)
+        delete _dir;
+    if (_logfile)
+        delete _logfile;
+    if (_logfp) {
+        delete _logfp;
+        _logfp = NULL;
+    }
 }
 
 void Log::init(const char *dir) {
@@ -75,7 +82,16 @@ void Log::error(const char *msg, ...) {
     va_end(args);
 }
 
+/*
+ * 计算出上一天的日志名
+ * 若今天20171210，则得到 _dir/20171209.log
+ * 若文件存在，压缩之
+ */
 void Log::close_old() {
+    if (_logfp) {
+        delete _logfp;
+    }
+
     time_t now_time;
     struct tm yesterday;
     char short_fn[16];
@@ -83,8 +99,8 @@ void Log::close_old() {
     time(&now_time);
     now_time -= 24 * 3600;
     localtime_r(&now_time, &yesterday);
-    sprintf(short_fn, "%04d%02d%02d.log",
-            yesterday.tm_year + 1900, yesterday.tm_mon + 1, yesterday.tm_mday);
+    sprintf(short_fn, "%04d%02d%02d.log", yesterday.tm_year + 1900,
+            yesterday.tm_mon + 1, yesterday.tm_mday);
     char *path = stradd(_dir, "/", short_fn);
     if (is_exist(path)) {
         gzip_compress(path);
@@ -92,23 +108,33 @@ void Log::close_old() {
     delete path;
 }
 
+/*
+ * 更新 _logfile, _this_day
+ * 压缩上一天的日志
+ * 初始化 及 到了第二天 时调用
+ */
 void Log::open_new() {
+    close_old();
+
     time_t now_time;
     struct tm now;
 
     time(&now_time);
     localtime_r(&now_time, &now);
-    sprintf(_logfile, "%s/%04d%02d%02d.log",
-            _dir, now.tm_year + 1900, now.tm_mon + 1, now.tm_mday);
+    sprintf(_logfile, "%s/%04d%02d%02d.log", _dir, now.tm_year + 1900,
+            now.tm_mon + 1, now.tm_mday);
+    _this_day = now.tm_mday;
 
-     _this_day = now.tm_mday;
+    _logfp = new File(_logfile, "a+");
+    if (_logfp == NULL) {
+        printf("[LOG] [ERROR] Cannot open file %s\n", _logfile);
+    }
     info("[LOG] Open the log by PID: %d.", getpid());
-
-    close_old();
 }
 
 void Log::write(const char *level, const char *msg, va_list args) {
-    if (!started()) return;
+    if (!started())
+        return;
 
     time_t now_time;
     struct tm now;
@@ -118,17 +144,41 @@ void Log::write(const char *level, const char *msg, va_list args) {
     localtime_r(&now_time, &now);
     strftime(buffer, 24, "%F %T", &now);
 
-    File *logfp = new File(_logfile, "a+");
-    if (!logfp->is_null()) {
-        logfp->print("%s [%s] ", buffer, level);
-        logfp->vprint(msg, args);
-        logfp->print("\n");
-        logfp->close();
+//    // NOTE: args不能使用两次
+//    if ((_level & CONSOLE_LEVEL) != 0) {
+//        printf("%s [%s] ", buffer, level);
+//        vprintf(msg, args);
+//        printf("\n");
+//    }
+//
+//    if (!_logfp->is_null()) {
+//        _logfp->print("%s [%s] ", buffer, level);
+//        _logfp->vprint(msg, args);
+//        _logfp->print("\n");
+//    } else {
+//        printf("[ERROR] [LOG] Empty _logfp!\n");
+//    }
+
+    char time_buf[50];
+    char log_buf[500];
+    sprintf(time_buf, "%s [%s] ", buffer, level);
+    vsprintf(log_buf, msg, args);
+    char* print_buf = stradd(time_buf, log_buf, "\n");
+
+    if ((_level & CONSOLE_LEVEL) != 0) {
+        printf("%s", print_buf);
     }
-    delete logfp;
+    if (!_logfp->is_null()) {
+        _logfp->print("%s", print_buf);
+    } else {
+        printf("[ERROR] [LOG] Empty _logfp!\n");
+    }
+
     if (now.tm_mday != _this_day) {
+        printf("[LOG] Another day!\n");
         open_new();
     }
+    delete print_buf;
 }
 
 Log log;
