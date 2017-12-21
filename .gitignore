@@ -1,0 +1,14 @@
+*.o
+*~
+*.so
+*.out
+*.deb
+*.txt
+*.gz
+.cproject
+.project
+
+.settings
+
+build
+deb_package
