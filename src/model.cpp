@@ -181,14 +181,23 @@ void all_disks_after_1s() {
     DiskInfo *disk;
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
-        // 等待磁盘完全开启
+        // 磁盘尚未完全开启
         if (disk->disk_state > 0) {
             disk->disk_state--;
         }
         // 如果磁盘完全开启，更新busy_time
-        if (disk->disk_state == 0) {
+        else if (disk->disk_state == 0) {
+            // 如果磁盘有传输任务
             if (disk->busy_time > 0) {
                 disk->busy_time--;
+            }
+            // 如果磁盘空转
+            else {
+                if (disk->idle_time < 60) {
+                    disk->idle_time++;
+                } else {
+
+                }
             }
         }
     }

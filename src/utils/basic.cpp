@@ -176,7 +176,7 @@ char *str2hex(const char *str, long length) {
 }
 
 /*
- * 将time_t转化为str，例如 "2017-12-12 19:03:45"
+ * 将time_t转化为地方时间str，例如 "2017-12-12 19:03:45"
  * @parm buf 存储结果，需要调用者提供空间，至少20byte
  */
 void time_t2str(time_t time, char *buf, size_t buf_size) {
@@ -186,7 +186,7 @@ void time_t2str(time_t time, char *buf, size_t buf_size) {
 }
 
 /*
- * 将str，例如 "2017-12-12 19:03:45, 转化为time_t"
+ * 将地方时间str，例如 "2017-12-12 19:03:45, 转化为time_t"
  */
 time_t str2time_t(const char *time_str) {
     struct tm ptm;
@@ -194,4 +194,17 @@ time_t str2time_t(const char *time_str) {
     // 按当地时区解析tmp_time
     time_t time = mktime(&ptm);
     return time;
+}
+
+/*
+ * 返回[a,b]的随机整数
+ */
+int random(int a, int b) {
+    static bool sranded = 0;
+    if (sranded == 0) {
+        srand((unsigned)time(NULL));
+        sranded = 1;
+    }
+    int ret = (rand() % (b - a + 1)) + a;
+    return ret;
 }

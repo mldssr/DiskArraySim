@@ -89,7 +89,7 @@ void Monitor::check() {
         log.debug("[MONITOR] FIONREAD!");
         return;
     }
-    log.debug("[MONITOR] Buffer size: %d", buffer_size);
+//    log.debug("[MONITOR] Buffer size: %d", buffer_size);
     int esize = sizeof(inotify_event);
     if (buffer_size < esize)
         return;

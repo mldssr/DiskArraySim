@@ -90,6 +90,7 @@ void Log::error(const char *msg, ...) {
 void Log::close_old() {
     if (_logfp) {
         delete _logfp;
+        _logfp = NULL;
     }
 
     time_t now_time;
@@ -168,14 +169,17 @@ void Log::write(const char *level, const char *msg, va_list args) {
     if ((_level & CONSOLE_LEVEL) != 0) {
         printf("%s", print_buf);
     }
-    if (!_logfp->is_null()) {
-        _logfp->print("%s", print_buf);
-    } else {
+
+    if (_logfp == NULL || _logfp->is_null()) {
         printf("[ERROR] [LOG] Empty _logfp!\n");
+        delete print_buf;
+        return;
+    } else {
+        _logfp->print("%s", print_buf);
     }
 
     if (now.tm_mday != _this_day) {
-        printf("[LOG] Another day!\n");
+        _logfp->print("[LOG] Another day!\n");
         open_new();
     }
     delete print_buf;

@@ -128,12 +128,34 @@ static void test_time() {
     strcpy(buf, "2017-12-20T23:33:59");
     buf[10] = ' ';
     time_t time = str2time_t(buf);
-//    printf("Convert str to time_t: %lld\n", time);
+//    printf("Convert str to time_t: %ld\n", time);
 
     char time_buf[20];
     time_t2str(time, time_buf, 20);
     assert(strcmp(buf, time_buf) == 0);
+    for (int i = 1; i <= 20; i++) {
+        memset(time_buf, 0, sizeof(time_buf));
+        time_t2str(time, time_buf, i);
+        printf("Convert time_t to str with buf size %d: %s\n", i, time_buf);
+    }
+
+    time_t t_0 = str2time_t("2016-03-14 08:00:00");
+    time_t t_1 = str2time_t("2016-03-14 23:59:59");
+    time_t t_2 = str2time_t("2016-03-15 00:00:00");
+    time_t t_3 = str2time_t("2016-03-15 07:59:59");
+    int days_0 = t_0 / 3600 / 24;
+    int days_1 = t_1 / 3600 / 24;
+    int days_2 = t_2 / 3600 / 24;
+    int days_3 = t_3 / 3600 / 24;
+    assert(days_0 == days_1 && days_1 == days_2 && days_2 == days_3);
     printf("Test time passed!\n");
+}
+
+static void test_random() {
+    for (int i = 0; i < 10; i++) {
+        printf("%d\n", random(10, 20));
+    }
+    printf("Test random passed!\n");
 }
 
 int main(int argc, char **argv) {
@@ -147,6 +169,6 @@ int main(int argc, char **argv) {
     test_strreplace();
     test_str2hex();
     test_time();
-
+    test_random();
     return 0;
 }

@@ -18,11 +18,13 @@ VPATH := src:test
 INCLUDE += -Isrc
 LIBFLAGS += -pthread
 
-UTILS := basic.cpp file.cpp config.cpp \
-		log.cpp monitor.cpp
+# make sure log comes before config, so that ~Log() comes after ~Config()
+UTILS := basic.cpp file.cpp log.cpp \
+		config.cpp monitor.cpp
 FILES := $(addprefix utils/,$(UTILS)) \
 		model.cpp \
-		data.cpp
+		data.cpp \
+		req.cpp
 AFILES := sim.cpp
 TFILES := test_basic.cpp \
 		test_file.cpp \
@@ -33,7 +35,8 @@ TFILES := test_basic.cpp \
 		test_monitor.cpp \
 		test_model.cpp \
 		test_test.cpp \
-		test_data.cpp
+		test_data.cpp \
+		test_req.cpp
 
 OBJS := $(addprefix $(BUILD),$(subst .cpp,.o,$(FILES)))
 AOBJS := $(addprefix $(BUILD),$(subst .cpp,.o,$(AFILES)))
@@ -82,13 +85,16 @@ test_monitor: $(BUILD)test_monitor
 	$(BUILD)test_monitor $(BUILD)logs/test $(BUILD)test
 
 test_model: $(BUILD)test_model
-	$(BUILD)test_model $(BUILD)tmplog
+	$(BUILD)test_model $(PWD)/conf.conf
 
 test_test: $(BUILD)test_test
-	$(BUILD)test_test $(BUILD)tmplog
+	$(BUILD)test_test $(PWD)/conf.conf
 
 test_data: $(BUILD)test_data
-	$(BUILD)test_data $(BUILD)tmplog
+	$(BUILD)test_data $(PWD)/conf.conf
+
+test_req: $(BUILD)test_req
+	$(BUILD)test_req $(PWD)/conf.conf
 
 .PHONY: build_dir pre_pkg deb
 
@@ -109,5 +115,5 @@ deb: pre_pkg
 	cd $(DEB_PATH); dpkg -b . ../$(DEB_PACKAGE)
 
 clean:
-	@rm -rf $(OBJS) $(AOBJS) $(APPS)
-	@rm -rf $(BUILD)*
+	@rm -rf $(OBJS) $(AOBJS) $(TOBJS) $(APPS) $(TAPPS)
+#	@rm -rf $(BUILD)*

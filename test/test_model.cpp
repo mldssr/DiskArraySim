@@ -16,6 +16,7 @@
 #include <assert.h>
 
 #include "utils/log.h"
+#include "utils/config.h"
 #include "model.h"
 #include "data.h"
 
@@ -74,11 +75,12 @@ static int test_handle_a_req() {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "Need a parameter of log path!");
+        fprintf(stderr, "Need a parameter of profile!");
         exit(1);
     }
-    char *filename = argv[1];
-    log.init(filename);
+    config.init(argv[1]);   // 初始化配置模块
+    char *log_dir = config.get_string("LOG", "TestLogDir", "build/test_logs");
+    log.init(log_dir);      // 初始化日志模块
 
 //    test_size();
 //    test_var();

@@ -14,19 +14,7 @@
 #include "utils/file.h"
 #include "model.h"
 #include "data.h"
-
-
-void test_parse_file(const char *file_name) {
-    if (parse_file(file_name) != 0) {
-        log.error("Fail to parse_file");
-    }
-}
-
-void test_scan_data(const char *dir) {
-    if (scan_data(dir) != 0) {
-        log.error("Fail to scan data");
-    }
-}
+#include "req.h"
 
 
 int main(int argc, char **argv) {
@@ -38,14 +26,11 @@ int main(int argc, char **argv) {
     char *log_dir = config.get_string("LOG", "TestLogDir", "build/test_logs");
     log.init(log_dir);      // 初始化日志模块
 
-    const char *data_name = "./AST3-2.obs.log.20160000.txt";
-//    test_parse_file(data_name);
+//    gen_req();
 
-    test_scan_data("data");
+    get_req();
 
-    show_all_disks();
 //    assert(!test_double());
-//    log.info("All tests passed!\n");
 
     return 0;
 }

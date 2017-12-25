@@ -4,6 +4,7 @@
  *  Created on: Jan 12, 2017
  *      Author: sunchao
  */
+#include "time.h"
 
 #ifndef BASIC_H_
 #define BASIC_H_
@@ -44,14 +45,20 @@ char *strreplace(const char *__restrict str, const char *__restrict from,
 char *str2hex(const char *str, long length);
 
 /*
- * 将time_t转化为str，例如 "2017-12-12 19:03:45"
+ * 将time_t转化为地方时间str，例如 "2017-12-12 19:03:45"
  * @parm buf 存储结果，需要调用者提供空间，至少20byte
  */
 void time_t2str(time_t time, char *buf, size_t buf_size);
 
 /*
- * 将str，例如 "2017-12-12 19:03:45, 转化为time_t"
+ * 将地方时间str，例如 "2017-12-12 19:03:45, 转化为time_t"
  */
 time_t str2time_t(const char *time);
+
+/*
+ * 返回[a,b]的随机整数
+ */
+int random(int a, int b);
+
 
 #endif /* BASIC_H_ */

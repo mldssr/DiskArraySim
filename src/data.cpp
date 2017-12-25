@@ -74,7 +74,7 @@ int parse_file(const char *file_name) {
 int scan_data(const char *dir) {
     const char *file_list = "files_list.txt";
     // 获取dir文件夹中所有文件名，存到 files_list.txt 中
-    if (system_call("ls -l %s | awk 'NR!=1 {print $9}' > %s", dir, file_list) != 0) {
+    if (system_call("ls -al %s | awk 'NR>3 {print $9}' > %s", dir, file_list) != 0) {
         log.error("[DATA] Fail to get file list of DIR [%s].", dir);
         return 1;
     }

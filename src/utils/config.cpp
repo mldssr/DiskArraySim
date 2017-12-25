@@ -143,7 +143,7 @@ Config::Config() {
 
 Config::~Config() {
     clear_config();
-    _monitor.stop();
+//    _monitor.stop();
     if (_dir != NULL) {
         delete _dir;
         _dir = NULL;
