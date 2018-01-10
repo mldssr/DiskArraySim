@@ -12,6 +12,7 @@
 
 /*
  * 解析文件file_name中的所有条目，依次存入到 data_disk_array 中
+ * @parm file_name 全路径
  * @return 0-success, 1-failed
  */
 int parse_file(const char *file_name);

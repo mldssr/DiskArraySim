@@ -9,9 +9,13 @@
 #include "utils/config.h"
 #include "model.h"
 
+#include "string.h"
+
 // 视场的长度与宽度
 int length = 3;
 int width = 1.5;
+// 每个请求返回的最大文件数
+int files_per_req = 10;
 
 // config.get_int("DATA", "DataDiskNum", 20)
 // data_disk_num 记录目前所用的DataDisk数量
@@ -106,6 +110,30 @@ bool is_target_file(FileInfo *file, double ra, double dec, time_t start, time_t 
 }
 
 /*
+ * 给定请求<ra, dec, time>，判断file的质量
+ */
+double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t end) {
+    double quality = 0.0;
+    if ((ra - length < file->ra) && (file->ra < ra + length)
+            && (dec - width < file->dec) && (file->dec < dec + width)
+            && (start <= file->time) && (file->time <= end)) {
+
+        double delta_length = ra - file->ra;
+        if (delta_length < 0.0)
+            delta_length = -delta_length;
+        double common_length = length - delta_length;
+
+        double delta_width = dec - file->dec;
+        if (delta_width < 0.0)
+            delta_width = -delta_width;
+        double common_width = width - delta_width;
+
+        quality = common_length * common_width / length / width;
+    }
+    return quality;
+}
+
+/*
  * 处理一次请求，即，找到所有相关文件，并缓存到CacheDisk中
  * @parm time 2017-12-12
  * @return 0 - success, 1 - failed
@@ -119,6 +147,14 @@ int handle_a_req(double ra, double dec, const char *time) {
     time_t end = str2time_t(end_time);
     delete end_time;
 
+    // 用来记录每个磁盘 涉及到的文件数 和 实际目标的文件数
+    int search_files[data_disk_num];
+    memset(search_files, 0, sizeof(search_files));
+    int target_files[data_disk_num];
+    memset(target_files, 0, sizeof(target_files));
+
+    std::multimap<double, FileInfo> target_file_map;
+
     // 遍历所有DataDisk
     for (int i = 0; i < data_disk_num; i++) {
         DiskInfo *disk = data_disk_array[i];
@@ -131,27 +167,61 @@ int handle_a_req(double ra, double dec, const char *time) {
         Key key1 { ra + length, dec + width, start };
         MAP::iterator iter_up = file_list->lower_bound(key1);
 
-        int total_search = 0;
-        int target_file = 0;
+        int total_search = 0;               // 记录本磁盘检查的 file 数
+        int target_file = 0;                // 记录本磁盘确认相关的 file 数
+
+        // 遍历本磁盘上所有可能的 file，以进一步确认是否相关
         for (MAP::iterator iter = iter_low; iter != iter_up; iter++) {
             total_search++;
-            if (is_target_file(&iter->second, ra, dec, start, end)) {
-                log.info("[MODEL] Find target file in disk %d", i);
+            double quality = file_quality(&iter->second, ra, dec, start, end);
+            if (quality > 0.0) {
+//                log.info("[MODEL] Find target file in disk %d", i);
+//                show_file(&iter->second);
+                target_file_map.insert(std::pair<double, FileInfo>(quality, iter->second));
                 target_file++;
-                show_file(&iter->second);
                 disk->idle_time = 0;
             }
         }
-        log.info("[MODEL] Find %d files among %d potential files in Disk %d of total %d files.",
-                target_file, total_search, disk->disk_id, disk->file_num);
+
+        search_files[i] = total_search;
+        target_files[i] = target_file;
+//        log.info("[MODEL] Find %d files among %d potential files in Disk %d of total %d files.",
+//                target_file, total_search, disk->disk_id, disk->file_num);
     }
+
+    log.info("[MODEL] ================================================== Request Summary");
+    log.info("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s", ra, dec, time);
+    log.info("[MODEL] disk_id    total_files    search_files    target_files");
+    for (int i = 0; i < data_disk_num; i++) {
+        log.info("[MODEL] %7d    %11d    %12d    %12d",
+                i, data_disk_array[i]->file_num, search_files[i], target_files[i]);
+    }
+    int total_files = target_file_map.size();
+    log.debug("[MODEL] Find %d target files in total.", total_files);
+    if (total_files > 10)
+        log.debug("[MODEL] Now return the top %d correlate files.", files_per_req);
+    else
+        log.debug("[MODEL] Now return all target files.");
+
+    int index = 0;
+    std::map<double, FileInfo>::reverse_iterator rit;
+    for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
+        // 处理文件
+        show_file(&rit->second);
+
+        // 只处理最相关的前 [files_per_req] 个文件
+        index++;
+        if (index == files_per_req)
+            break;
+    }
+
     return 0;
 }
 
 void show_file(FileInfo *file) {
     char buf[20];
     time_t2str(file->time, buf, sizeof(buf));
-    log.info("[FileInfo] file_id %d   file_size %d   ra %f   dec %f   time %s",
+    log.info("[File ] file_id %d   file_size %d   ra %9.4f   dec %9.4f   time %s",
             file->file_id, file->file_size, file->ra, file->dec, buf);
 }
 
