@@ -16,6 +16,8 @@ int length = 3;
 int width = 1.5;
 // 每个请求返回的最大文件数
 int files_per_req = 10;
+// HDD 启动时间，默认5秒
+int disk_start_time = 5;
 
 // config.get_int("DATA", "DataDiskNum", 20)
 // data_disk_num 记录目前所用的DataDisk数量
@@ -75,10 +77,17 @@ int add_file(DiskInfo *disk, FileInfo *file) {
     return 0;
 }
 
+/*
+ * 将 file 按顺序自动放入 DataDisks
+ * 即将其放入最后一块空闲的 dataDisk，如果满了再启动下一块
+ */
 int add_file(FileInfo *file) {
     // 初始化第1块disk
     if (data_disk_num == 0) {
-        data_disk_array[data_disk_num] = new_DiskInfo(data_disk_num, 5, config.get_int("DATA", "DataDiskSize", 2000000));
+        data_disk_array[data_disk_num] = new_DiskInfo(
+                data_disk_num,
+                disk_start_time,
+                config.get_int("DATA", "DataDiskSize", 2000000));
         data_disk_num++;
     }
     // 当前disk空间不足
@@ -87,8 +96,10 @@ int add_file(FileInfo *file) {
             log.error("[MODEL] No extra DataDisks to hold more data!");
             return 1;
         }
-        // 假设磁盘需要5秒启动时间
-        data_disk_array[data_disk_num] = new_DiskInfo(data_disk_num, 5, config.get_int("DATA", "DataDiskSize", 2000000));
+        data_disk_array[data_disk_num] = new_DiskInfo(
+                data_disk_num,
+                disk_start_time,
+                config.get_int("DATA", "DataDiskSize", 2000000));
         data_disk_num++;
     }
 
