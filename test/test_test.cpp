@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <list>
 
 #include "utils/log.h"
 #include "utils/config.h"
@@ -146,6 +147,27 @@ static void test_random() {
     printf("RAND_MAX: %lu\n", RAND_MAX);
 }
 
+static void test_stl_list() {
+    std::list<std::pair<int, int>> mylist;
+    std::list<std::pair<int, int>>::iterator iter;
+    for (int i = 1; i <= 5; ++i) {
+        mylist.push_back(std::make_pair(i, -i));
+    }
+
+    for (iter = mylist.begin(); iter != mylist.end(); ++iter) {
+        printf("%d   %d\n", iter->first, iter->second);
+    }
+
+    iter = mylist.begin();
+    iter++;
+    iter->first = 21;
+
+    for (iter = mylist.begin(); iter != mylist.end(); ++iter) {
+        printf("%d   %d\n", iter->first, iter->second);
+    }
+
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Need a parameter of profile!");
@@ -162,7 +184,8 @@ int main(int argc, char **argv) {
 //    test_EOF();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
-    test_random();
+//    test_random();
+    test_stl_list();
 
     return 0;
 }

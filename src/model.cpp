@@ -4,12 +4,13 @@
  *  Created on: Dec 9, 2017
  *      Author: lxx
  */
+#include <list>
+#include "string.h"
+
 #include "time.h"
 #include "utils/log.h"
 #include "utils/config.h"
 #include "model.h"
-
-#include "string.h"
 
 // 视场的长度与宽度
 int length = 3;
@@ -18,6 +19,8 @@ int width = 1.5;
 int files_per_req = 10;
 // HDD 启动时间，默认5秒
 int disk_start_time = 5;
+// 传输一个文件所用的时间
+int trans_time_per_file = 4;
 
 // config.get_int("DATA", "DataDiskNum", 20)
 // data_disk_num 记录目前所用的DataDisk数量
@@ -45,41 +48,184 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
 
     disk->disk_id = disk_id;
     disk->disk_state = disk_state;
-    disk->busy_time = 0;
     disk->idle_time = 0;
     disk->disk_size = disk_size;
     disk->left_space = disk_size;
     disk->file_num = 0;
+
     disk->file_list = new MAP;
+
+    disk->wt_file_list = new RW_LIST;
+    disk->rd_file_list = new RW_LIST;
 
     return disk;
 }
 
-void del_DiskInfo(DiskInfo *disk){
-    disk->file_list->clear();
+void del_DiskInfo(DiskInfo *disk) {
+//    disk->file_list->clear();               // Maybe not need
     delete disk->file_list;
     disk->file_list = NULL;
+
+    delete disk->rd_file_list;
+    disk->rd_file_list = NULL;
+
+    delete disk->wt_file_list;
+    disk->wt_file_list = NULL;
 
     delete disk;
 }
 
 /*
- * 需要保证 file 一定可以放入 disk
+ * 需要保证 disk 的 file_list 中一定存在 file
+ * wt_file_list 中不用管
+ * 将 file 复制进 disk 的 rd_file_list 中
  */
-int add_file(DiskInfo *disk, FileInfo *file) {
+void read_file(DiskInfo *disk, FileInfo *file) {
+    disk->rd_file_list->push_back(std::make_pair(trans_time_per_file, *file));
+    // 启动磁盘
+    if (disk->disk_state == 0) {
+        disk->disk_state = 1;
+    }
+}
+
+/*
+ * 需要保证 file 一定可以放入 disk
+ * 将 file 复制进 disk 的 wt_file_list 中
+ */
+void write_file(DiskInfo *disk, FileInfo *file) {
+    disk->wt_file_list->push_back(std::make_pair(trans_time_per_file, *file));
+    disk->left_space -= file->file_size;
+    disk->file_num += 1;
+    // 启动磁盘
+    if (disk->disk_state == 0) {
+        disk->disk_state = 1;
+    }
+}
+
+/*
+ * 从 disk 中删除 file
+ * 可能再 file_list，也可能在 wt_file_list
+ * 需要保证一定 file 一定存在
+ */
+void delete_file(FileInfo *file, DiskInfo *disk) {
+    Key key(file->ra, file->dec, file->time);
+
+    // 从 files_list 中删除
+    MAP* file_list = disk->file_list;
+    MAP::iterator iter = file_list->find(key);
+    if (iter != file_list->end()) {
+        file_list->erase(iter);
+        log.info("[DELFI] In disk %d, delete a file.", disk->disk_id);
+        return;
+    }
+
+    // 否则，从 wt_file_list 中删除
+    RW_LIST* wt_file_list = disk->wt_file_list;
+    RW_LIST::iterator list_iter;
+    for (list_iter = wt_file_list->begin(); list_iter != wt_file_list->end(); list_iter++) {
+        if (file->ra == list_iter->second.ra
+                && file->dec == list_iter->second.dec
+                && file->time == list_iter->second.time) {
+            wt_file_list->erase(list_iter);
+            log.debug("[DELFI] In disk %d, delete a file being transferring.", disk->disk_id);
+        }
+    }
+}
+
+/*
+ * 搜索 file 是否在 disk 中
+ * 既检查 file_list，又检查 wt_file_list
+ * @return  0 --- not found;
+ * @return  1 --- found
+ * @return  2 --- half-found (Found in wt_file_list)
+ */
+int search_file(FileInfo *file, DiskInfo *disk) {
+    Key key(file->ra, file->dec, file->time);
+
+    // 检查是否在 file_list 里
+    MAP *file_list = disk->file_list;
+    MAP::iterator iter = file_list->find(key);
+    if (iter != file_list->end()) {
+        log.info("[SERCH] Found in disk %d.", disk->disk_id);
+        return 1;
+    }
+
+    // 检查是否在 writing_file_list 里
+    RW_LIST*wt_file_list = disk->wt_file_list;
+    RW_LIST::iterator list_iter;
+    for (list_iter = wt_file_list->begin(); list_iter != wt_file_list->end(); list_iter++) {
+        if (file->ra == list_iter->second.ra
+                && file->dec == list_iter->second.dec
+                && file->time == list_iter->second.time) {
+            log.info("[SERCH] Found in disk %d, but it is being transferring.",
+                    disk->disk_id);
+        }
+        return 2;
+    }
+
+    return 0;
+}
+
+/*
+ * 将 file 从 disk_fr 复制到 disk_to
+ * 这会在整个系统中产生副本数据
+ * @return  0 --- success, 1 --- failed
+ */
+int copy_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to) {
+    // 检查 file 是否在 disk_fr
+    if (search_file(file, disk_fr) == 0) {
+        log.error("[CPFIL] Failed for not find source file.");
+        return 1;
+    }
+    // 检查 file 是否在 disk_fr
+    if (search_file(file, disk_to) > 0) {
+        log.info("[CPFIL] Ignore this copy operation for file already existing.");
+        return 0;
+    }
+    // 检查 disk_to 是否能装下 file
+    if (disk_to->left_space < file->file_size) {
+        log.error("[CPFIL] Failed for no space of disk_to.");
+        return 1;
+    }
+
+    write_file(disk_to, file);
+
+    return 0;
+}
+
+/*
+ * 将 file 从 disk_fr 移动到 disk_to
+ * @return  0 --- success, 1 --- failed
+ */
+int move_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to) {
+    // 检查 file 是否在 disk_fr
+    if (copy_file(file, disk_fr, disk_to) == 1) {
+        log.error("[MVFIL] Failed to copy file first.");
+        return 1;
+    }
+
+    // 删除原磁盘中的文件
+    delete_file(file, disk_fr);
+
+    return 0;
+}
+
+/*
+ * 需要保证 file 一定可以放入 disk
+ * 忽略传输时间，直接将 file 复制进 disk 的 file_list 中
+ * 只用于系统初始化建立元数据索引时
+ */
+void add_file_init(DiskInfo *disk, FileInfo *file) {
     Key key(file->ra, file->dec, file->time);
     disk->file_list->insert(PAIR(key, *file));
     disk->left_space -= file->file_size;
     disk->file_num += 1;
-    if (!disk->disk_state) {
-        disk->disk_state = 1;
-    }
-    return 0;
 }
 
 /*
  * 将 file 按顺序自动放入 DataDisks
  * 即将其放入最后一块空闲的 dataDisk，如果满了再启动下一块
+ * 只用于系统初始化建立元数据索引时
  */
 int add_file(FileInfo *file) {
     // 初始化第1块disk
@@ -103,7 +249,7 @@ int add_file(FileInfo *file) {
         data_disk_num++;
     }
 
-    add_file(data_disk_array[data_disk_num - 1], file);
+    add_file_init(data_disk_array[data_disk_num - 1], file);
 
     return 0;
 }
@@ -145,7 +291,7 @@ double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t 
 }
 
 /*
- * 处理一次请求，即，找到所有相关文件，并缓存到CacheDisk中
+ * 处理一次请求，即，找到所有相关文件，并缓存到 CacheDisk 中
  * @parm time 2017-12-12
  * @return 0 - success, 1 - failed
  */
@@ -166,7 +312,7 @@ int handle_a_req(double ra, double dec, const char *time) {
 
     std::multimap<double, FileInfo> target_file_map;
 
-    // 遍历所有DataDisk
+    // 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
     for (int i = 0; i < data_disk_num; i++) {
         DiskInfo *disk = data_disk_array[i];
         if (disk == NULL)
@@ -198,7 +344,7 @@ int handle_a_req(double ra, double dec, const char *time) {
         target_files[i] = target_file;
 //        log.info("[MODEL] Find %d files among %d potential files in Disk %d of total %d files.",
 //                target_file, total_search, disk->disk_id, disk->file_num);
-    }
+    }// END 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
 
     log.info("[MODEL] ================================================== Request Summary");
     log.info("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s", ra, dec, time);
@@ -215,10 +361,11 @@ int handle_a_req(double ra, double dec, const char *time) {
         log.debug("[MODEL] Now return all target files.");
 
     int index = 0;
-    std::map<double, FileInfo>::reverse_iterator rit;
+    std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
         // 处理文件
         show_file(&rit->second);
+
 
         // 只处理最相关的前 [files_per_req] 个文件
         index++;
@@ -238,8 +385,8 @@ void show_file(FileInfo *file) {
 
 void show_disk(DiskInfo *disk) {
     log.info("================================================== DiskInfo");
-    log.info("[DiskInfo] disk_id %d   disk_state %d   busy_time %d   idle_time %d",
-            disk->disk_id, disk->disk_state, disk->busy_time, disk->idle_time);
+    log.info("[DiskInfo] disk_id %d   disk_state %d   idle_time %d",
+            disk->disk_id, disk->disk_state, disk->idle_time);
     log.info("[DiskInfo] disk_size %d   left_space %d   file_num %d",
             disk->disk_size, disk->left_space, disk->file_num);
     MAP*file_list = disk->file_list;
@@ -262,17 +409,34 @@ void all_disks_after_1s() {
     DiskInfo *disk;
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
-        // 磁盘尚未完全开启
-        if (disk->disk_state > 0) {
-            disk->disk_state--;
+        int state = disk->disk_state;
+        // 磁盘处于关闭状态
+        if (state == 0) {
+            continue;
         }
-        // 如果磁盘完全开启，更新busy_time
-        else if (disk->disk_state == 0) {
-            // 如果磁盘有传输任务
-            if (disk->busy_time > 0) {
-                disk->busy_time--;
+        // 磁盘尚未完全开启
+        else if (state > 0 && state < disk_start_time) {
+            disk->disk_state++;
+        }
+        // 磁盘完全开启，有读写任务
+        else if (disk->wt_file_list->size() > 0 || disk->rd_file_list->size() > 0) {
+            // 如果磁盘已经在工作
+            if (state == disk_start_time) {
             }
             // 如果磁盘空转
+            else {
+                disk->disk_state = disk_start_time;
+            }
+            // 处理读写任务
+
+        }
+        // 磁盘完全开启，无读写任务，更新busy_time
+        else {
+            // 如果磁盘在工作状态，标志其为空闲状态
+            if (state == disk_start_time) {
+                disk->disk_state++;
+            }
+            // 如果磁盘空转，空闲时间 +1
             else {
                 if (disk->idle_time < 60) {
                     disk->idle_time++;

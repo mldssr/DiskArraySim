@@ -9,9 +9,11 @@
 #define MODEL_H_
 
 #include <map>
+#include <list>
 
-#define MAP     std::map<Key, FileInfo>
-#define PAIR    std::pair<Key, FileInfo>
+#define MAP         std::map<Key, FileInfo>
+#define PAIR        std::pair<Key, FileInfo>
+#define RW_LIST     std::list<std::pair<int, FileInfo>>
 
 struct FileInfo {
     int file_id;
@@ -45,23 +47,28 @@ struct Key {
 
 struct DiskInfo {
     int disk_id;
-    int disk_state;             //  0 - 空转
-                                // +n - 还需n秒才能开启
-    int busy_time;              // 处理完目前的请求任务需要的时间
+    int disk_state;             // 0 - 关闭
+                                // n - 还需 (5-n) 秒才能开启
+                                // 5 - 正在传输数据（假设 HDD 启动时间为 5，定义在 model.cpp 里）
+                                // 6 - 空转
     int idle_time;              // 到目前为止的空转时间
 
     int disk_size;              // MB
     int left_space;             // MB
     int file_num;
 
-    MAP *file_list; // Size: 48 bytes, <file_id, file>
+    MAP *file_list;             // Size: 48 bytes, <Key, FileInfo>
+
+    // 正在写入的文件，与 file_list 无交集，<left_writing_time(s), file>
+    RW_LIST *wt_file_list;
+    // 正在读取的文件，是 file_list 的子集，<left_reading_time(s), file>，暂不使用
+    RW_LIST *rd_file_list;
 };
 
 FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t time);
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size);
 void del_DiskInfo(DiskInfo *disk);
 
-int add_file(DiskInfo *disk, FileInfo *file);
 int add_file(FileInfo *file);
 
 /*
@@ -79,6 +86,7 @@ int handle_a_req(double ra, double dec, const char *time);
 void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
+
 /*
  * 经过1s后，更新所有disk的状态
  */
