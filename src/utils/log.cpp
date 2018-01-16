@@ -58,7 +58,7 @@ void Log::debug(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write(false, "DEBUG", msg, args);
+    write(0, "DEBUG", msg, args);
     va_end(args);
 }
 
@@ -68,7 +68,7 @@ void Log::info(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write(false, "INFO ", msg, args);
+    write(0, "INFO ", msg, args);
     va_end(args);
 }
 
@@ -78,15 +78,23 @@ void Log::error(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write(false, "ERROR", msg, args);
+    write(0, "ERROR", msg, args);
     va_end(args);
 }
 
-/* 不加前置时间戳，同 printf() */
-void Log::pure_printf(const char *msg, ...) {
+/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，同 printf() */
+void Log::pure(const char *msg, ...) {
     va_list args;
     va_start(args, msg);
-    write(true, "ERROR", msg, args);
+    write(1, "ERROR", msg, args);
+    va_end(args);
+}
+
+/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，同 pure()，但会在开头空格，使内容对齐 */
+void Log::sublog(const char *msg, ...) {
+    va_list args;
+    va_start(args, msg);
+    write(2, "ERROR", msg, args);
     va_end(args);
 }
 
@@ -142,9 +150,11 @@ void Log::open_new() {
 }
 
 /*
- * @parm pure 若为 true，表示不加前置时间戳，同 printf()，level 参数也失效
+ * @parm mode 若为 0，表示添加前置时间戳和 LEVEL
+ *            若为 1，表示不加前置时间戳和 LEVEL，同 printf()，参数 level 失效
+ *            若为 2，表示不加前置时间戳和 LEVEL，同 printf()，但会在开头空格，使内容对齐，参数 level 失效
  */
-void Log::write(bool pure, const char *level, const char *msg, va_list args) {
+void Log::write(int mode, const char *level, const char *msg, va_list args) {
     if (!started())
         return;
 
@@ -176,18 +186,20 @@ void Log::write(bool pure, const char *level, const char *msg, va_list args) {
     sprintf(time_buf, "%s [%s] ", buffer, level);
     vsprintf(log_buf, msg, args);
     char* print_buf;                // 此条日志的最终内容
-    if (pure)
+    if (mode == 0)
+        print_buf = stradd(time_buf, log_buf, "\n");
+    else if (mode == 1)
         print_buf = log_buf;
     else
-        print_buf = stradd(time_buf, log_buf, "\n");
+        print_buf = stradd("                            ", log_buf);
 
-    if ((_level & CONSOLE_LEVEL) != 0 || pure) {
+    if ((_level & CONSOLE_LEVEL) != 0 || mode > 0) {
         printf("%s", print_buf);
     }
 
     if (_logfp == NULL || _logfp->is_null()) {
         printf("[ERROR] [LOG] Empty _logfp!\n");
-        if (!pure) delete print_buf;
+        if (mode != 1) delete print_buf;
         return;
     } else {
         _logfp->print("%s", print_buf);
@@ -197,7 +209,7 @@ void Log::write(bool pure, const char *level, const char *msg, va_list args) {
         _logfp->print("[LOG] Another day!\n");
         open_new();
     }
-    if (!pure) delete print_buf;
+    if (mode != 1) delete print_buf;
 }
 
 Log log;

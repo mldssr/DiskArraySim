@@ -73,33 +73,27 @@ static int test_file_operation() {
     add_file_init(file0, disk0);
     log.info("After add file0:");
     show_disk(disk0);
-    log.pure_printf("\n");
 
     write_file(file1, disk0);
     log.info("After write_file(disk0, file1):");
     show_disk(disk0);
-    log.pure_printf("\n");
 
     int ret = search_file(file1, disk0);
     log.info("search_file(file1, disk0) returns :%d", ret);
-    log.pure_printf("\n");
 
     ret = copy_file(file1, disk0, disk1);
     log.info("copy_file(file1, disk0, disk1) returns :%d", ret);
     show_disk(disk0);
     show_disk(disk1);
-    log.pure_printf("\n");
 
     delete_file(file1, disk0);
     log.info("After delete_file(file1, disk0):");
     show_disk(disk0);
-    log.pure_printf("\n");
 
     ret = move_file(file1, disk1, disk0);
     log.info("move_file(file1, disk1, disk0) returns :%d", ret);
     show_disk(disk0);
     show_disk(disk1);
-    log.pure_printf("\n");
 
     delete file0, file1, file2;
 

@@ -378,40 +378,39 @@ int handle_a_req(double ra, double dec, const char *time) {
 void show_file(FileInfo *file) {
     char buf[20];
     time_t2str(file->time, buf, sizeof(buf));
-    log.info("[File ] file_id %d   file_size %d   ra %9.4f   dec %9.4f   time %s",
+    log.sublog("[File ] file_id %d   file_size %d   ra %9.4f   dec %9.4f   time %s\n",
             file->file_id, file->file_size, file->ra, file->dec, buf);
 }
 
 void show_disk(DiskInfo *disk) {
     log.info("================================================== DiskInfo");
     int permill = disk->left_space * 1000 / disk->disk_size;
-    log.info("[DiskInfo] id %d   state %d   size %d   left_space %d (%d‰)   file_num %d",
+    log.sublog("[DiskInfo] id %d   state %d   size %d   left_space %d (%d‰)   file_num %d\n",
             disk->disk_id, disk->disk_state, disk->disk_size, disk->left_space, permill, disk->file_num);
 
-    log.info("-------------------------------------------------- file_list");
+    log.sublog("-------------------------------------------------- file_list\n");
     MAP* file_list = disk->file_list;
     MAP::iterator iter;
     for (iter = file_list->begin(); iter != file_list->end(); iter++) {
         show_file(&iter->second);
     }
-    log.info("");
+    log.pure("\n");
 
-    log.info("-------------------------------------------------- wt_file_list");
+    log.sublog("-------------------------------------------------- wt_file_list\n");
     RW_LIST* wt_file_list = disk->wt_file_list;
     RW_LIST::iterator wt_iter;
     for (wt_iter = wt_file_list->begin(); wt_iter != wt_file_list->end(); wt_iter++) {
         show_file(&wt_iter->second);
     }
-    log.info("");
+    log.pure("\n");
 
-    log.info("-------------------------------------------------- rd_file_list");
+    log.sublog("-------------------------------------------------- rd_file_list\n");
     RW_LIST* rd_file_list = disk->rd_file_list;
     RW_LIST::iterator rd_iter;
     for (rd_iter = rd_file_list->begin(); rd_iter != rd_file_list->end(); rd_iter++) {
         show_file(&rd_iter->second);
     }
-    log.info("");
-
+    log.pure("\n");
 }
 
 void show_all_disks() {

@@ -21,7 +21,8 @@ static int test_log()
     log.debug("Frist entry of the log!");
     log.info("The No. %d entry!", num++);
     log.error("The %s entry!", str);
-    log.pure_printf("The %dth entry.\n\n", 4);
+    log.pure("The %dth entry.\n", 4);
+    log.sublog("The %dth entry.\n", 5);
 
     return 0;
 }
