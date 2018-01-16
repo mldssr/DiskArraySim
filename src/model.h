@@ -50,11 +50,10 @@ struct FileInfo {
 
 struct DiskInfo {
     int disk_id;
-    int disk_state;             // 0 - 关闭
-                                // n - 还需 (5-n) 秒才能开启
-                                // 5 - 正在传输数据（假设 HDD 启动时间为 5，定义在 model.cpp 里）
-                                // 6 - 空转
-    int idle_time;              // 到目前为止的空转时间
+    int disk_state;             // -5 - 关闭（假设 HDD 启动时间为 5，定义在 model.cpp 里）
+                                // -n - 还需 n 秒才能开启
+                                //  0 - 正在传输数据
+                                //  n - 已经空转了 n 秒
 
     int disk_size;              // MB
     int left_space;             // MB

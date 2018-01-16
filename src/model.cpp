@@ -48,7 +48,6 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
 
     disk->disk_id = disk_id;
     disk->disk_state = disk_state;
-    disk->idle_time = 0;
     disk->disk_size = disk_size;
     disk->left_space = disk_size;
     disk->file_num = 0;
@@ -83,8 +82,8 @@ void del_DiskInfo(DiskInfo *disk) {
 void read_file(FileInfo *file, DiskInfo *disk) {
     disk->rd_file_list->push_back(std::make_pair(trans_time_per_file, *file));
     // 启动磁盘
-    if (disk->disk_state == 0) {
-        disk->disk_state = 1;
+    if (disk->disk_state == 0 - disk_start_time) {
+        disk->disk_state++;
     }
 }
 
@@ -97,8 +96,8 @@ void write_file(FileInfo *file, DiskInfo *disk) {
     disk->left_space -= file->file_size;
     disk->file_num += 1;
     // 启动磁盘
-    if (disk->disk_state == 0) {
-        disk->disk_state = 1;
+    if (disk->disk_state == 0 - disk_start_time) {
+        disk->disk_state++;
     }
 }
 
@@ -337,7 +336,6 @@ int handle_a_req(double ra, double dec, const char *time) {
 //                show_file(&iter->second);
                 target_file_map.insert(std::pair<double, FileInfo>(quality, iter->second));
                 target_file++;
-                disk->idle_time = 0;
             }
         }
 
@@ -386,10 +384,9 @@ void show_file(FileInfo *file) {
 
 void show_disk(DiskInfo *disk) {
     log.info("================================================== DiskInfo");
-    log.info("[DiskInfo] disk_id %d   disk_state %d   idle_time %d",
-            disk->disk_id, disk->disk_state, disk->idle_time);
-    log.info("[DiskInfo] disk_size %d   left_space %d   file_num %d",
-            disk->disk_size, disk->left_space, disk->file_num);
+    int permill = disk->left_space * 1000 / disk->disk_size;
+    log.info("[DiskInfo] id %d   state %d   size %d   left_space %d (%d‰)   file_num %d",
+            disk->disk_id, disk->disk_state, disk->disk_size, disk->left_space, permill, disk->file_num);
 
     log.info("-------------------------------------------------- file_list");
     MAP* file_list = disk->file_list;
@@ -431,35 +428,35 @@ void all_disks_after_1s() {
         disk = data_disk_array[i];
         int state = disk->disk_state;
         // 磁盘处于关闭状态
-        if (state == 0) {
+        if (state == 0 - disk_start_time) {
             continue;
         }
         // 磁盘尚未完全开启
-        else if (state > 0 && state < disk_start_time) {
+        else if (state < 0) {
             disk->disk_state++;
         }
         // 磁盘完全开启，有读写任务
         else if (disk->wt_file_list->size() > 0 || disk->rd_file_list->size() > 0) {
             // 如果磁盘已经在工作
-            if (state == disk_start_time) {
+            if (state == 0) {
             }
             // 如果磁盘空转
             else {
-                disk->disk_state = disk_start_time;
+                disk->disk_state = 0;
             }
             // 处理读写任务
 
         }
-        // 磁盘完全开启，无读写任务，更新busy_time
+        // 磁盘完全开启，无读写任务，更新 busy_time
         else {
             // 如果磁盘在工作状态，标志其为空闲状态
-            if (state == disk_start_time) {
+            if (state == 0) {
                 disk->disk_state++;
             }
             // 如果磁盘空转，空闲时间 +1
             else {
-                if (disk->idle_time < 60) {
-                    disk->idle_time++;
+                if (disk->disk_state < 60) {
+                    disk->disk_state++;
                 } else {
 
                 }
