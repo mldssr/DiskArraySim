@@ -15,14 +15,6 @@
 #define PAIR        std::pair<Key, FileInfo>
 #define RW_LIST     std::list<std::pair<int, FileInfo>>
 
-struct FileInfo {
-    int file_id;
-    int file_size;              // MB
-    double ra;                  // 赤经(Right ascension), 0 ~ 360
-    double dec;                 // 赤纬(Declination), -90 ~ +90
-    time_t time;
-};
-
 struct Key {
     double ra;
     double dec;
@@ -43,6 +35,17 @@ struct Key {
                 || (ra == o.ra && dec < o.dec)
                 || (ra == o.ra && dec == o.dec && time < o.time);
     }
+};
+
+struct FileInfo {
+    int file_id;
+    int file_size;              // MB
+    double ra;                  // 赤经(Right ascension), 0 ~ 360
+    double dec;                 // 赤纬(Declination), -90 ~ +90
+    time_t time;
+
+    Key cor_files[5];           // 相关文件列表，若本文件被命中，其相关文件的 hit_prob 增大
+    int hit_prob;               // 指示本文件被命中的概率
 };
 
 struct DiskInfo {
@@ -69,12 +72,28 @@ FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size);
 void del_DiskInfo(DiskInfo *disk);
 
+void read_file(FileInfo *file, DiskInfo *disk);
+
+void write_file(FileInfo *file, DiskInfo *disk);
+
+void delete_file(FileInfo *file, DiskInfo *disk);
+
+int search_file(FileInfo *file, DiskInfo *disk);
+
+int copy_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to);
+
+int move_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to);
+
+void add_file_init(FileInfo *file, DiskInfo *disk);
+
 int add_file(FileInfo *file);
 
 /*
  * 判断file是否符合请求<ra, dec, time>的要求
  */
 bool is_target_file(FileInfo *file, double ra, double dec, time_t start, time_t end);
+
+double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t end);
 
 /*
  * 处理一次请求，即，找到所有相关文件，并缓存到CacheDisk中

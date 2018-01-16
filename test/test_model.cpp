@@ -31,17 +31,17 @@ static int test_size() {
     log.info("Size of file_list: %d %d", sizeof(*(disk->file_list)), disk->file_list->size());
     show_disk(disk);
 
-    add_file(disk, file0);
+    add_file_init(file0, disk);
     log.info("After add file0:");
     log.info("Size of file_list: %d %d", sizeof(*(disk->file_list)), disk->file_list->size());
     show_disk(disk);
 
-    add_file(disk, file1);
+    add_file_init(file1, disk);
     log.info("After add file1:");
     log.info("Size of file_list: %d %d", sizeof(*(disk->file_list)), disk->file_list->size());
     show_disk(disk);
 
-    add_file(disk, file2);
+    add_file_init(file2, disk);
     log.info("After add file2:");
     log.info("Size of file_list: %d %d", sizeof(*(disk->file_list)), disk->file_list->size());
     show_disk(disk);
@@ -56,6 +56,55 @@ static int test_size() {
     del_DiskInfo(disk);
 //    map->insert(PAIR(Key(1, 4), *file0));
 //    log.info("Size of file_list: %d %d", sizeof(*map), map->size());
+
+    return 0;
+}
+
+/*
+ * 测试 read_file(), write_file(), delete_file(), search_file(), copy_file(), move_file(),
+ */
+static int test_file_operation() {
+    DiskInfo *disk0 = new_DiskInfo(0, 0, 2000000);
+    DiskInfo *disk1 = new_DiskInfo(0, 0, 2000000);
+    FileInfo *file0 = new_FileInfo(0, 500, 34, -46, 0);
+    FileInfo *file1 = new_FileInfo(1, 450, 12, 1, 0);
+    FileInfo *file2 = new_FileInfo(1, 450, 12, -1, 0);
+
+    add_file_init(file0, disk0);
+    log.info("After add file0:");
+    show_disk(disk0);
+    log.pure_printf("\n");
+
+    write_file(file1, disk0);
+    log.info("After write_file(disk0, file1):");
+    show_disk(disk0);
+    log.pure_printf("\n");
+
+    int ret = search_file(file1, disk0);
+    log.info("search_file(file1, disk0) returns :%d", ret);
+    log.pure_printf("\n");
+
+    ret = copy_file(file1, disk0, disk1);
+    log.info("copy_file(file1, disk0, disk1) returns :%d", ret);
+    show_disk(disk0);
+    show_disk(disk1);
+    log.pure_printf("\n");
+
+    delete_file(file1, disk0);
+    log.info("After delete_file(file1, disk0):");
+    show_disk(disk0);
+    log.pure_printf("\n");
+
+    ret = move_file(file1, disk1, disk0);
+    log.info("move_file(file1, disk1, disk0) returns :%d", ret);
+    show_disk(disk0);
+    show_disk(disk1);
+    log.pure_printf("\n");
+
+    delete file0, file1, file2;
+
+    del_DiskInfo(disk0);
+    del_DiskInfo(disk1);
 
     return 0;
 }
@@ -84,8 +133,9 @@ int main(int argc, char **argv) {
     log.init(log_dir);      // 初始化日志模块
 
 //    test_size();
+    test_file_operation();
 //    test_var();
-    test_handle_a_req();
+//    test_handle_a_req();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
 

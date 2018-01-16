@@ -58,7 +58,7 @@ void Log::debug(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write("DEBUG", msg, args);
+    write(false, "DEBUG", msg, args);
     va_end(args);
 }
 
@@ -68,7 +68,7 @@ void Log::info(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write("INFO ", msg, args);
+    write(false, "INFO ", msg, args);
     va_end(args);
 }
 
@@ -78,7 +78,15 @@ void Log::error(const char *msg, ...) {
 
     va_list args;
     va_start(args, msg);
-    write("ERROR", msg, args);
+    write(false, "ERROR", msg, args);
+    va_end(args);
+}
+
+/* 不加前置时间戳，同 printf() */
+void Log::pure_printf(const char *msg, ...) {
+    va_list args;
+    va_start(args, msg);
+    write(true, "ERROR", msg, args);
     va_end(args);
 }
 
@@ -133,7 +141,10 @@ void Log::open_new() {
     info("[LOG] Open the log by PID: %d.", getpid());
 }
 
-void Log::write(const char *level, const char *msg, va_list args) {
+/*
+ * @parm pure 若为 true，表示不加前置时间戳，同 printf()，level 参数也失效
+ */
+void Log::write(bool pure, const char *level, const char *msg, va_list args) {
     if (!started())
         return;
 
@@ -160,19 +171,23 @@ void Log::write(const char *level, const char *msg, va_list args) {
 //        printf("[ERROR] [LOG] Empty _logfp!\n");
 //    }
 
-    char time_buf[50];
-    char log_buf[500];
+    char time_buf[50];              // 此条日志的开头，"2018-01-16 15:59:17 [INFO ] "
+    char log_buf[500];              // 此条日志的实际内容
     sprintf(time_buf, "%s [%s] ", buffer, level);
     vsprintf(log_buf, msg, args);
-    char* print_buf = stradd(time_buf, log_buf, "\n");
+    char* print_buf;                // 此条日志的最终内容
+    if (pure)
+        print_buf = log_buf;
+    else
+        print_buf = stradd(time_buf, log_buf, "\n");
 
-    if ((_level & CONSOLE_LEVEL) != 0) {
+    if ((_level & CONSOLE_LEVEL) != 0 || pure) {
         printf("%s", print_buf);
     }
 
     if (_logfp == NULL || _logfp->is_null()) {
         printf("[ERROR] [LOG] Empty _logfp!\n");
-        delete print_buf;
+        if (!pure) delete print_buf;
         return;
     } else {
         _logfp->print("%s", print_buf);
@@ -182,7 +197,7 @@ void Log::write(const char *level, const char *msg, va_list args) {
         _logfp->print("[LOG] Another day!\n");
         open_new();
     }
-    delete print_buf;
+    if (!pure) delete print_buf;
 }
 
 Log log;

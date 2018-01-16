@@ -32,7 +32,7 @@ private:
     /* 关闭日志文件。如果当前已打开日志文件，则将其关闭并压缩。 */
     void close_old();
     /* 记录日志信息。参数：日志级别，信息，信息的参数。 */
-    void write(const char *level, const char *msg, va_list args);
+    void write(bool pure, const char *level, const char *msg, va_list args);
 
 public:
     Log();
@@ -54,6 +54,8 @@ public:
     void info(const char *msg, ...);
     /* 记录错误信息。 */
     void error(const char *msg, ...);
+    /* 不加前置时间戳，同 printf() */
+    void pure_printf(const char *msg, ...);
 };
 
 /* 全局变量。便于记录日志。 */

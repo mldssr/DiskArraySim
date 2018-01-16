@@ -21,6 +21,7 @@ static int test_log()
     log.debug("Frist entry of the log!");
     log.info("The No. %d entry!", num++);
     log.error("The %s entry!", str);
+    log.pure_printf("The %dth entry.\n\n", 4);
 
     return 0;
 }
@@ -42,7 +43,7 @@ int main(int argc, char **argv)
     printf("Test Log.\n");
     /* test the routine log writing. */
     assert(test_log() == 0);
-    test_log();
+//    test_log();
 
     printf("All tests passed!\n");
     return 0;

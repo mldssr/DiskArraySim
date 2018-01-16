@@ -12,7 +12,7 @@
 #include "utils/config.h"
 #include "model.h"
 
-// 视场的长度与宽度
+// 视场的长度与宽度，也是请求天区的长宽
 int length = 3;
 int width = 1.5;
 // 每个请求返回的最大文件数
@@ -80,7 +80,7 @@ void del_DiskInfo(DiskInfo *disk) {
  * wt_file_list 中不用管
  * 将 file 复制进 disk 的 rd_file_list 中
  */
-void read_file(DiskInfo *disk, FileInfo *file) {
+void read_file(FileInfo *file, DiskInfo *disk) {
     disk->rd_file_list->push_back(std::make_pair(trans_time_per_file, *file));
     // 启动磁盘
     if (disk->disk_state == 0) {
@@ -92,7 +92,7 @@ void read_file(DiskInfo *disk, FileInfo *file) {
  * 需要保证 file 一定可以放入 disk
  * 将 file 复制进 disk 的 wt_file_list 中
  */
-void write_file(DiskInfo *disk, FileInfo *file) {
+void write_file(FileInfo *file, DiskInfo *disk) {
     disk->wt_file_list->push_back(std::make_pair(trans_time_per_file, *file));
     disk->left_space -= file->file_size;
     disk->file_num += 1;
@@ -105,7 +105,7 @@ void write_file(DiskInfo *disk, FileInfo *file) {
 /*
  * 从 disk 中删除 file
  * 可能再 file_list，也可能在 wt_file_list
- * 需要保证一定 file 一定存在
+ * 不需要保证 file 一定存在
  */
 void delete_file(FileInfo *file, DiskInfo *disk) {
     Key key(file->ra, file->dec, file->time);
@@ -126,8 +126,9 @@ void delete_file(FileInfo *file, DiskInfo *disk) {
         if (file->ra == list_iter->second.ra
                 && file->dec == list_iter->second.dec
                 && file->time == list_iter->second.time) {
-            wt_file_list->erase(list_iter);
+            wt_file_list->erase(list_iter); // 注意：erase()后，iter 就过期了
             log.debug("[DELFI] In disk %d, delete a file being transferring.", disk->disk_id);
+            break;
         }
     }
 }
@@ -151,7 +152,7 @@ int search_file(FileInfo *file, DiskInfo *disk) {
     }
 
     // 检查是否在 writing_file_list 里
-    RW_LIST*wt_file_list = disk->wt_file_list;
+    RW_LIST* wt_file_list = disk->wt_file_list;
     RW_LIST::iterator list_iter;
     for (list_iter = wt_file_list->begin(); list_iter != wt_file_list->end(); list_iter++) {
         if (file->ra == list_iter->second.ra
@@ -188,7 +189,7 @@ int copy_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to) {
         return 1;
     }
 
-    write_file(disk_to, file);
+    write_file(file, disk_to);
 
     return 0;
 }
@@ -215,7 +216,7 @@ int move_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to) {
  * 忽略传输时间，直接将 file 复制进 disk 的 file_list 中
  * 只用于系统初始化建立元数据索引时
  */
-void add_file_init(DiskInfo *disk, FileInfo *file) {
+void add_file_init(FileInfo *file, DiskInfo *disk) {
     Key key(file->ra, file->dec, file->time);
     disk->file_list->insert(PAIR(key, *file));
     disk->left_space -= file->file_size;
@@ -249,7 +250,7 @@ int add_file(FileInfo *file) {
         data_disk_num++;
     }
 
-    add_file_init(data_disk_array[data_disk_num - 1], file);
+    add_file_init(file, data_disk_array[data_disk_num - 1]);
 
     return 0;
 }
@@ -267,7 +268,7 @@ bool is_target_file(FileInfo *file, double ra, double dec, time_t start, time_t 
 }
 
 /*
- * 给定请求<ra, dec, time>，判断file的质量
+ * 给定请求<ra, dec, time>，判断file的质量，即两个区域公共部分的占比
  */
 double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t end) {
     double quality = 0.0;
@@ -389,12 +390,31 @@ void show_disk(DiskInfo *disk) {
             disk->disk_id, disk->disk_state, disk->idle_time);
     log.info("[DiskInfo] disk_size %d   left_space %d   file_num %d",
             disk->disk_size, disk->left_space, disk->file_num);
-    MAP*file_list = disk->file_list;
+
+    log.info("-------------------------------------------------- file_list");
+    MAP* file_list = disk->file_list;
     MAP::iterator iter;
     for (iter = file_list->begin(); iter != file_list->end(); iter++) {
         show_file(&iter->second);
     }
     log.info("");
+
+    log.info("-------------------------------------------------- wt_file_list");
+    RW_LIST* wt_file_list = disk->wt_file_list;
+    RW_LIST::iterator wt_iter;
+    for (wt_iter = wt_file_list->begin(); wt_iter != wt_file_list->end(); wt_iter++) {
+        show_file(&wt_iter->second);
+    }
+    log.info("");
+
+    log.info("-------------------------------------------------- rd_file_list");
+    RW_LIST* rd_file_list = disk->rd_file_list;
+    RW_LIST::iterator rd_iter;
+    for (rd_iter = rd_file_list->begin(); rd_iter != rd_file_list->end(); rd_iter++) {
+        show_file(&rd_iter->second);
+    }
+    log.info("");
+
 }
 
 void show_all_disks() {
