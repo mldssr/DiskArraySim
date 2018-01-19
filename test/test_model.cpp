@@ -117,6 +117,43 @@ static int test_handle_a_req() {
     return 0;
 }
 
+static int test_update_rw_list() {
+    DiskInfo *disk0 = new_DiskInfo(0, -5, 2000000);
+    DiskInfo *disk1 = new_DiskInfo(0, -5, 2000000);
+    FileInfo *file0 = new_FileInfo(0, 500, 34, -46, 0);
+    FileInfo *file1 = new_FileInfo(1, 450, 12, 1, 0);
+    FileInfo *file2 = new_FileInfo(1, 450, 12, -1, 0);
+
+    write_file(file0, disk0);
+    show_disk(disk0);
+
+    update_wt_list(disk0);
+    update_rd_list(disk0);
+    show_disk(disk0);
+
+    add_file_init(file1, disk0);
+    read_file(file1, disk0);
+    show_disk(disk0);
+
+    update_wt_list(disk0);
+    update_rd_list(disk0);
+    show_disk(disk0);
+
+    update_wt_list(disk0);
+    update_rd_list(disk0);
+    show_disk(disk0);
+
+    update_wt_list(disk0);
+    update_rd_list(disk0);
+    show_disk(disk0);
+
+    update_wt_list(disk0);
+    update_rd_list(disk0);
+    show_disk(disk0);
+
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Need a parameter of profile!");
@@ -127,11 +164,13 @@ int main(int argc, char **argv) {
     log.init(log_dir);      // 初始化日志模块
 
 //    test_size();
-    test_file_operation();
+//    test_file_operation();
 //    test_var();
 //    test_handle_a_req();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
+
+    test_update_rw_list();
 
     return 0;
 }

@@ -167,6 +167,64 @@ int search_file(FileInfo *file, DiskInfo *disk) {
 }
 
 /*
+ * 搜索 file 在哪些 DataDisk 中，返回最佳的 disk_id
+ * 最佳应考虑各个磁盘的相应时间，磁盘状态
+ * 只检查 file_list，不检查 wt_file_list
+ * @return  -1 --- not found;
+ * @return   n --- 最佳的 disk_id
+ */
+int search_all_disks(FileInfo *file) {
+    // 统计可选方案
+    bool has_target[data_disk_num];
+    int disk_tasks[data_disk_num];
+    int disk_states[data_disk_num];
+    for (int i = 0; i < data_disk_num; i++) {
+        // [IF] 实实在在找到
+        if (search_file(file, data_disk_array[i]) == 1) {
+            has_target[i] = true;
+        } else {
+            has_target[i] = false;
+        }
+
+        int rd_size = data_disk_array[i]->rd_file_list->size();
+        int wt_size = data_disk_array[i]->wt_file_list->size();
+        disk_tasks[i] = rd_size + wt_size;
+
+        disk_states[i] = data_disk_array[i]->disk_state;
+    }
+
+    // 从开着的（包括正在启动的）disk 中找到最不忙的
+    int cur_tasks = 10000;
+    int disk_id = -1;
+    for (int i = 0; i < data_disk_num; i++) {
+        if (has_target[i] && disk_states[i] > 0 - disk_start_time) {
+            if (disk_tasks[i] < cur_tasks) {
+                disk_id = i;
+                cur_tasks = disk_tasks[i];
+            }
+        }
+    }
+    if (cur_tasks < 10000)
+        return disk_id;
+
+    // 从关着的 disk 中找到最忙的
+    cur_tasks = -1;
+    disk_id = -1;
+    for (int i = 0; i < data_disk_num; i++) {
+        if (has_target[i] && disk_states[i] == 0 - disk_start_time) {
+            if (disk_tasks[i] > cur_tasks) {
+                disk_id = i;
+                cur_tasks = disk_tasks[i];
+            }
+        }
+    }
+    if (cur_tasks > -1)
+        return disk_id;
+
+    return -1;
+}
+
+/*
  * 将 file 从 disk_fr 复制到 disk_to
  * 这会在整个系统中产生副本数据
  * @return  0 --- success, 1 --- failed
@@ -345,26 +403,28 @@ int handle_a_req(double ra, double dec, const char *time) {
 //                target_file, total_search, disk->disk_id, disk->file_num);
     }// END 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
 
-    log.info("[MODEL] ================================================== Request Summary");
-    log.info("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s", ra, dec, time);
-    log.info("[MODEL] disk_id    total_files    search_files    target_files");
+    log.info("[MODEL] ======================================== Request Summary ========");
+    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s\n", ra, dec, time);
+    log.sublog("[MODEL] disk_id    total_files    search_files    target_files\n");
     for (int i = 0; i < data_disk_num; i++) {
-        log.info("[MODEL] %7d    %11d    %12d    %12d",
+        log.sublog("[MODEL] %7d    %11d    %12d    %12d\n",
                 i, data_disk_array[i]->file_num, search_files[i], target_files[i]);
     }
     int total_files = target_file_map.size();
-    log.debug("[MODEL] Find %d target files in total.", total_files);
+    log.sublog("[MODEL] Find %d target files in total.\n", total_files);
+
     if (total_files > 10)
-        log.debug("[MODEL] Now return the top %d correlate files.", files_per_req);
+        log.info("[MODEL] Now return the top %d correlate files.", files_per_req);
     else
-        log.debug("[MODEL] Now return all target files.");
+        log.info("[MODEL] Now return all target files.");
 
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
         // 处理文件
         show_file(&rit->second);
-
+        int disk_id = search_all_disks(&rit->second);
+        read_file(&rit->second, data_disk_array[disk_id]);
 
         // 只处理最相关的前 [files_per_req] 个文件
         index++;
@@ -383,12 +443,12 @@ void show_file(FileInfo *file) {
 }
 
 void show_disk(DiskInfo *disk) {
-    log.info("================================================== DiskInfo");
+    log.info("[DiskInfo] ========================================================================================");
     int permill = disk->left_space * 1000 / disk->disk_size;
     log.sublog("[DiskInfo] id %d   state %d   size %d   left_space %d (%d‰)   file_num %d\n",
             disk->disk_id, disk->disk_state, disk->disk_size, disk->left_space, permill, disk->file_num);
 
-    log.sublog("-------------------------------------------------- file_list\n");
+    log.sublog("-------------------------------------------------- file_list --------\n");
     MAP* file_list = disk->file_list;
     MAP::iterator iter;
     for (iter = file_list->begin(); iter != file_list->end(); iter++) {
@@ -396,18 +456,20 @@ void show_disk(DiskInfo *disk) {
     }
     log.pure("\n");
 
-    log.sublog("-------------------------------------------------- wt_file_list\n");
+    log.sublog("-------------------------------------------------- wt_file_list --------\n");
     RW_LIST* wt_file_list = disk->wt_file_list;
     RW_LIST::iterator wt_iter;
     for (wt_iter = wt_file_list->begin(); wt_iter != wt_file_list->end(); wt_iter++) {
+        log.sublog("[%d]\n", wt_iter->first);
         show_file(&wt_iter->second);
     }
     log.pure("\n");
 
-    log.sublog("-------------------------------------------------- rd_file_list\n");
+    log.sublog("-------------------------------------------------- rd_file_list --------\n");
     RW_LIST* rd_file_list = disk->rd_file_list;
     RW_LIST::iterator rd_iter;
     for (rd_iter = rd_file_list->begin(); rd_iter != rd_file_list->end(); rd_iter++) {
+        log.sublog("[%d]\n", rd_iter->first);
         show_file(&rd_iter->second);
     }
     log.pure("\n");
@@ -418,6 +480,44 @@ void show_all_disks() {
     for (int i = 0; i < data_disk_num; i++) {
         log.debug("[MODEL] Show disk %d", i);
         show_disk(data_disk_array[i]);
+    }
+}
+
+void update_wt_list(DiskInfo *disk) {
+    RW_LIST::iterator iter = disk->wt_file_list->begin();
+    if (iter != disk->wt_file_list->end()) {
+        // 传输 1 秒数据
+        if (iter->first > 0) {
+            iter->first--;
+        }
+        // 若传输完毕，将 file 从 wt_list 移动到 file_list
+        if (iter->first == 0) {
+            FileInfo *file = &iter->second;
+            Key key(file->ra, file->dec, file->time);
+            disk->file_list->insert(PAIR(key, *file));
+            disk->wt_file_list->erase(iter);
+        }
+    }
+}
+
+void update_rd_list(DiskInfo *disk) {
+    RW_LIST::iterator iter = disk->rd_file_list->begin();
+    if (iter != disk->rd_file_list->end()) {
+        // 传输 1 秒数据
+        if (iter->first > 0) {
+            iter->first--;
+        }
+        // 若传输完毕，将 file 从 rd_list 直接删除
+        if (iter->first == 0) {
+            disk->rd_file_list->erase(iter);
+        }
+    }
+}
+
+void update_all_rw_list() {
+    for (int i = 0; i < data_disk_num; i++) {
+        update_wt_list(data_disk_array[i]);
+        update_rd_list(data_disk_array[i]);
     }
 }
 
@@ -444,7 +544,7 @@ void all_disks_after_1s() {
                 disk->disk_state = 0;
             }
             // 处理读写任务
-
+            update_all_rw_list();
         }
         // 磁盘完全开启，无读写任务，更新 busy_time
         else {

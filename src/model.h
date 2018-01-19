@@ -105,6 +105,10 @@ void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
 
+void update_wt_list(DiskInfo *disk);
+
+void update_rd_list(DiskInfo *disk);
+
 /*
  * 经过1s后，更新所有disk的状态
  */
