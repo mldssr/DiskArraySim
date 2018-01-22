@@ -541,7 +541,7 @@ void update_rd_list(DiskInfo *disk) {
     }
 }
 
-void update_all_rw_list() {
+static void update_all_rw_list() {
     for (int i = 0; i < data_disk_num; i++) {
         update_wt_list(data_disk_array[i]);
         update_rd_list(data_disk_array[i]);

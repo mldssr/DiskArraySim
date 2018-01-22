@@ -196,15 +196,24 @@ time_t str2time_t(const char *time_str) {
     return time;
 }
 
+static bool sranded = 0;
 /*
- * 返回[a,b]的随机整数
+ * 返回[min, max]的随机整数
  */
-int random(int a, int b) {
-    static bool sranded = 0;
+int random(int min, int max) {
     if (sranded == 0) {
-        srand((unsigned)time(NULL));
+        srand((unsigned) time(NULL));
         sranded = 1;
     }
-    int ret = (rand() % (b - a + 1)) + a;
+    int ret = (rand() % (max - min + 1)) + min;
     return ret;
+}
+
+double random(double min, double max) {
+    if (sranded == 0) {
+        srand((unsigned) time(NULL));
+        sranded = 1;
+    }
+    double f = (double) rand() / RAND_MAX;
+    return min + f * (max - min);
 }

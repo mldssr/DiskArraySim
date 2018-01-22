@@ -56,9 +56,11 @@ void time_t2str(time_t time, char *buf, size_t buf_size);
 time_t str2time_t(const char *time);
 
 /*
- * 返回[a,b]的随机整数
+ * 返回[min, max]的随机整数
  */
-int random(int a, int b);
+int random(int min, int max);
+
+double random(double min, double max);
 
 
 #endif /* BASIC_H_ */

@@ -14,9 +14,13 @@
 #include "model.h"
 #include "req.h"
 
-// <int, Req> means <req_time, Req>
+// <int, Req> means <gen_time, Req>
 R_MAP req_list;
 
+/*
+ * 返回 time 对应的天数（1970.01.01 为第 0 天）
+ * @parm time 例如  "2016-03-14"
+ */
 static int str2days(const char *time) {
     char *full_time = stradd(time, " 08:00:00");
     int days = str2time_t(full_time) / 3600 / 24;
@@ -35,6 +39,11 @@ void gen_req() {
     int max_days = config.get_int("REQ", "MaxDays", 1);
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
 
+    double ra_min = config.get_double("REQ", "RaMin", 0.0);
+    double ra_max = config.get_double("REQ", "RaMax", 360.0);
+    double dec_min = config.get_double("REQ", "DecMin", -30.0);
+    double dec_max = config.get_double("REQ", "DecMax", -90.0);
+
     int start_day = str2days(min_time);
     int end_day = str2days(max_time);
 
@@ -42,15 +51,15 @@ void gen_req() {
         log.debug("User %d", i);
         int days_per_user = random(1, max_days);
 
-        int req_time = random(1, max_req_time);
-        int ra = (double) random(0, 357);
-        int dec = (double) random(-90, 88);
+        int gen_time = random(1, max_req_time);
+        double ra = random(ra_min, ra_max);
+        double dec = random(dec_min, dec_max);
         int day = random(start_day, end_day - days_per_user + 1);
 
         for (int j = 0; j < days_per_user; j++) {
             log.debug("User %d, day %d", i, j);
             Req req;
-            req.gen_time = req_time;
+            req.gen_time = gen_time;
             req.ra = ra;
             req.dec = dec;
             time_t2str((long) (day + j) * 3600 * 24, req.tg_date, 11);
@@ -107,21 +116,21 @@ void get_req() {
     }
 
     // 输出 req_list 的内容，调试时使用
-    log.debug("[req_list] ========================================================================================");
-    R_MAP::iterator iter;
-    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
-        log.debug("%d   %9.4f   %9.4f   %s", iter->second.gen_time, iter->second.ra,
-                iter->second.dec, iter->second.tg_date);
-        for (int i = 0; i < MaxFilesPerReq; i++) {
-            File_track *track = &iter->second.tracks[i];
-            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
-                continue;
-            }
-            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
-                    track->file_id, track->res_mom, track->hand_over_mom);
-        }
-        log.pure("\n");
-    }
+//    log.debug("[req_list] ========================================================================================");
+//    R_MAP::iterator iter;
+//    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
+//        log.debug("%d   %9.4f   %9.4f   %s", iter->second.gen_time, iter->second.ra,
+//                iter->second.dec, iter->second.tg_date);
+//        for (int i = 0; i < MaxFilesPerReq; i++) {
+//            File_track *track = &iter->second.tracks[i];
+//            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
+//                continue;
+//            }
+//            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
+//                    track->file_id, track->res_mom, track->hand_over_mom);
+//        }
+//        log.pure("\n");
+//    }
 }
 
 /*
@@ -217,15 +226,11 @@ void record_all_req() {
         }
 
         // 写入 qos，-1 表示尚未完成， 0 表示未匹配到文件
-        log.debug("%d %d", min_hand_over_mom, 0x7fffffff);
-        log.debug("%d", iter->second.hand_over);
         int qos = min_hand_over_mom - iter->second.gen_time;
         if (!iter->second.hand_over) {
-            log.debug("qos = -1");
             qos = -1;
         }
         if (iter->second.hand_over && min_hand_over_mom == 0x7fffffff) {
-            log.debug("qos = 0");
             qos = 0;
         }
         file.print(",%d\n", qos);
