@@ -23,4 +23,9 @@ int parse_file(const char *file_name);
  */
 int scan_data(const char *dir);
 
+/*
+ * 工具：分析 data_disk_array 中的数据，将结果写入到 footprint.txt
+ */
+void footprint();
+
 #endif /* SRC_DATA_H_ */

@@ -41,8 +41,8 @@ void gen_req() {
 
     double ra_min = config.get_double("REQ", "RaMin", 0.0);
     double ra_max = config.get_double("REQ", "RaMax", 360.0);
-    double dec_min = config.get_double("REQ", "DecMin", -30.0);
-    double dec_max = config.get_double("REQ", "DecMax", -90.0);
+    double dec_min = config.get_double("REQ", "DecMin", -87.0);
+    double dec_max = config.get_double("REQ", "DecMax", -30.0);
 
     int start_day = str2days(min_time);
     int end_day = str2days(max_time);

@@ -28,6 +28,9 @@ void test_scan_data(const char *dir) {
     }
 }
 
+void test_footprint() {
+    footprint();
+}
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -42,8 +45,9 @@ int main(int argc, char **argv) {
 //    test_parse_file(data_name);
 
     test_scan_data("data");
+    test_footprint();
 
-    show_all_disks();
+//    show_all_disks();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
 

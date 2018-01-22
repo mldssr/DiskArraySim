@@ -58,6 +58,13 @@ int parse_file(const char *file_name) {
 
         // 按当地时区解析tmp_time
         time = mktime(tmp_time);
+
+        // 排除逻辑上错误的数据，对于 (AST3 2016)，等价于 exptime == 0.0
+        if (ra < 0.0 || ra > 360.0 || dec < -90.0 || dec > 90.0) {
+//            log.sublog("[DATA] Invalid data from %s.\n", file_name);
+            continue;
+        }
+
         FileInfo *file = new_FileInfo(file_id_num++,
                 config.get_int("DATA", "FileSize", 200), ra, dec, time);
         add_file(file);
@@ -106,3 +113,41 @@ int scan_data(const char *dir) {
     return 0;
 }
 
+
+/*
+ * 工具：分析 data_disk_array 中的数据，将结果写入到 footprint.txt
+ */
+void footprint() {
+    double ra_min = 360.0;
+    double ra_max = 0.0;
+    double dec_min = 90.0;
+    double dec_max = -90.0;
+
+    for (int i = 0; i < data_disk_num; i++) {
+        // 只考虑 file_list
+        MAP* file_list = data_disk_array[i]->file_list;
+        MAP::iterator iter;
+        for (iter = file_list->begin(); iter != file_list->end(); iter++) {
+            double ra = iter->second.ra;
+            double dec = iter->second.dec;
+            if (ra < ra_min) {
+                ra_min = ra;
+            }
+            if (ra > ra_max) {
+                ra_max = ra;
+            }
+            if (dec < dec_min) {
+                dec_min = dec;
+            }
+            if (dec > dec_max) {
+                dec_max = dec;
+            }
+        }
+    }
+
+    File file("footprint.txt", "w");
+    file.print("ra_min: %9.4f\n", ra_min);
+    file.print("ra_max: %9.4f\n", ra_max);
+    file.print("dec_min: %9.4f\n", dec_min);
+    file.print("dec_max: %9.4f\n", dec_max);
+}
