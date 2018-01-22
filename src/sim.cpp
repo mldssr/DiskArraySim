@@ -6,6 +6,9 @@
  */
 #include "utils/log.h"
 #include "utils/config.h"
+#include "model.h"
+#include "data.h"
+#include "req.h"
 
 int main(int argc, char **argv) {
     // 初始化配置文件
@@ -17,6 +20,36 @@ int main(int argc, char **argv) {
     char *log_dir = config.get_string("LOG", "Directory", "build/logs");
     log.init(log_dir);      // 初始化日志模块
 
+    // 扫描数据
+    const char *dir = config.get_string("DATA", "Dir", "data");
+    if (scan_data(dir) != 0) {
+        log.error("Fail to scan data");
+    }
+
+    // 获取请求
+    get_req();
+
+    // 运行
+    record_disk_state_init();
+    int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
+    R_MAP::iterator iter = req_list.begin();
+    while(exp_time < max_req_time + 1000) {
+//        log.debug("exp_time: %d", exp_time);
+        // 处理请求
+        while (iter->second.gen_time == exp_time) {
+            handle_a_req(&iter->second);
+            iter++;
+            if (iter != req_list.end()) {
+                log.debug("Next req's gen_time: %d", iter->second.gen_time);
+            }
+        }
+
+        all_disks_after_1s();
+        record_disk_state();
+        exp_time++;
+    }
+
+    record_all_req();
 
     return 0;
 }

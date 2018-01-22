@@ -11,6 +11,8 @@
 #include <map>
 #include <list>
 
+#include "req.h"
+
 #define MAP         std::map<Key, FileInfo>
 #define PAIR        std::pair<Key, FileInfo>
 #define RW_LIST     std::list<std::pair<int, FileInfo>>
@@ -87,9 +89,6 @@ void add_file_init(FileInfo *file, DiskInfo *disk);
 
 int add_file(FileInfo *file);
 
-/*
- * 判断file是否符合请求<ra, dec, time>的要求
- */
 bool is_target_file(FileInfo *file, double ra, double dec, time_t start, time_t end);
 
 double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t end);
@@ -99,14 +98,16 @@ double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t 
  * @parm time 2017-12-12
  * @return 0 - success, 1 - failed
  */
-int handle_a_req(double ra, double dec, const char *time);
+int handle_a_req(Req *req);
 
 void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
 
-void update_wt_list(DiskInfo *disk);
+void record_disk_state_init();
+void record_disk_state();
 
+void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);
 
 /*
@@ -114,6 +115,7 @@ void update_rd_list(DiskInfo *disk);
  */
 void all_disks_after_1s();
 
+extern int exp_time;
 extern int file_id_num;
 extern int data_disk_num;
 extern int cache_disk_num;

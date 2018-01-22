@@ -9,14 +9,20 @@
 
 #include "time.h"
 #include "utils/log.h"
+#include "utils/file.h"
 #include "utils/config.h"
 #include "model.h"
+//#include "req.h"
+
+// 实验中的模拟计时，从 0 开始，每秒加 1
+int exp_time = 0;
+// 日志：记录每秒钟所有磁盘的状态
+char *disk_state_track_file = config.get_string("TRACK", "DiskStateTrackFile", "disk_state_track.csv");
+File track_state(disk_state_track_file, "w");
 
 // 视场的长度与宽度，也是请求天区的长宽
 int length = 3;
 int width = 1.5;
-// 每个请求返回的最大文件数
-int files_per_req = 10;
 // HDD 启动时间，默认5秒
 int disk_start_time = 5;
 // 传输一个文件所用的时间
@@ -290,7 +296,7 @@ int add_file(FileInfo *file) {
     if (data_disk_num == 0) {
         data_disk_array[data_disk_num] = new_DiskInfo(
                 data_disk_num,
-                disk_start_time,
+                0 - disk_start_time,
                 config.get_int("DATA", "DataDiskSize", 2000000));
         data_disk_num++;
     }
@@ -302,7 +308,7 @@ int add_file(FileInfo *file) {
         }
         data_disk_array[data_disk_num] = new_DiskInfo(
                 data_disk_num,
-                disk_start_time,
+                0 - disk_start_time,
                 config.get_int("DATA", "DataDiskSize", 2000000));
         data_disk_num++;
     }
@@ -353,12 +359,12 @@ double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t 
  * @parm time 2017-12-12
  * @return 0 - success, 1 - failed
  */
-int handle_a_req(double ra, double dec, const char *time) {
+int handle_a_req(Req *req) {
     // 获取目标天的 time_t 范围
-    char *start_time = stradd(time, " 00:00:00");
+    char *start_time = stradd(req->tg_date, " 00:00:00");
     time_t start = str2time_t(start_time);
     delete start_time;
-    char *end_time = stradd(time, " 23:59:59");
+    char *end_time = stradd(req->tg_date, " 23:59:59");
     time_t end = str2time_t(end_time);
     delete end_time;
 
@@ -368,18 +374,17 @@ int handle_a_req(double ra, double dec, const char *time) {
     int target_files[data_disk_num];
     memset(target_files, 0, sizeof(target_files));
 
-    std::multimap<double, FileInfo> target_file_map;
-
     // 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
+    std::multimap<double, FileInfo> target_file_map;
     for (int i = 0; i < data_disk_num; i++) {
         DiskInfo *disk = data_disk_array[i];
         if (disk == NULL)
             break;
         MAP*file_list = disk->file_list;
         // 找到磁盘中符合条件的文件的上界和下界
-        Key key0 { ra - length, dec - width, end };
+        Key key0 { req->ra - length, req->dec - width, end };
         MAP::iterator iter_low = file_list->upper_bound(key0);
-        Key key1 { ra + length, dec + width, start };
+        Key key1 { req->ra + length, req->dec + width, start };
         MAP::iterator iter_up = file_list->lower_bound(key1);
 
         int total_search = 0;               // 记录本磁盘检查的 file 数
@@ -388,7 +393,7 @@ int handle_a_req(double ra, double dec, const char *time) {
         // 遍历本磁盘上所有可能的 file，以进一步确认是否相关
         for (MAP::iterator iter = iter_low; iter != iter_up; iter++) {
             total_search++;
-            double quality = file_quality(&iter->second, ra, dec, start, end);
+            double quality = file_quality(&iter->second, req->ra, req->dec, start, end);
             if (quality > 0.0) {
 //                log.info("[MODEL] Find target file in disk %d", i);
 //                show_file(&iter->second);
@@ -404,7 +409,7 @@ int handle_a_req(double ra, double dec, const char *time) {
     }// END 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
 
     log.info("[MODEL] ======================================== Request Summary ========");
-    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s\n", ra, dec, time);
+    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s\n", req->ra, req->dec, req->tg_date);
     log.sublog("[MODEL] disk_id    total_files    search_files    target_files\n");
     for (int i = 0; i < data_disk_num; i++) {
         log.sublog("[MODEL] %7d    %11d    %12d    %12d\n",
@@ -413,10 +418,10 @@ int handle_a_req(double ra, double dec, const char *time) {
     int total_files = target_file_map.size();
     log.sublog("[MODEL] Find %d target files in total.\n", total_files);
 
-    if (total_files > 10)
-        log.info("[MODEL] Now return the top %d correlate files.", files_per_req);
+    if (total_files > MaxFilesPerReq)
+        log.info("[MODEL] Now return the top %d correlate files.", MaxFilesPerReq);
     else
-        log.info("[MODEL] Now return all target files.");
+        log.info("[MODEL] Now return all %d target files.", total_files);
 
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
@@ -425,10 +430,11 @@ int handle_a_req(double ra, double dec, const char *time) {
         show_file(&rit->second);
         int disk_id = search_all_disks(&rit->second);
         read_file(&rit->second, data_disk_array[disk_id]);
+        add_file_track(req, rit->second.file_id);
 
-        // 只处理最相关的前 [files_per_req] 个文件
+        // 只处理最相关的前 [MaxFilesPerReq] 个文件
         index++;
-        if (index == files_per_req)
+        if (index == MaxFilesPerReq)
             break;
     }
 
@@ -438,7 +444,7 @@ int handle_a_req(double ra, double dec, const char *time) {
 void show_file(FileInfo *file) {
     char buf[20];
     time_t2str(file->time, buf, sizeof(buf));
-    log.sublog("[File ] file_id %d   file_size %d   ra %9.4f   dec %9.4f   time %s\n",
+    log.sublog("[File ] file_id %5d   file_size %d   ra %9.4f   dec %9.4f   time %s\n",
             file->file_id, file->file_size, file->ra, file->dec, buf);
 }
 
@@ -483,6 +489,26 @@ void show_all_disks() {
     }
 }
 
+void record_disk_state_init() {
+    // 写入第一行
+    track_state.print("time");
+    for (int i = 0; i < data_disk_num; i++) {
+        // hand_over_mom0, hand_over_mom1, hand_over_mom2...
+        track_state.print(",disk_%d", i);
+    }
+    track_state.print("\n");
+}
+
+void record_disk_state() {
+    // 写入时间
+    track_state.print("%d", exp_time);
+    // 写入当前磁盘状态
+    for (int i = 0; i < data_disk_num; i++) {
+        track_state.print(",%d", data_disk_array[i]->disk_state);
+    }
+    track_state.print("\n");
+}
+
 void update_wt_list(DiskInfo *disk) {
     RW_LIST::iterator iter = disk->wt_file_list->begin();
     if (iter != disk->wt_file_list->end()) {
@@ -509,6 +535,7 @@ void update_rd_list(DiskInfo *disk) {
         }
         // 若传输完毕，将 file 从 rd_list 直接删除
         if (iter->first == 0) {
+            hand_over_a_file(iter->second.file_id);
             disk->rd_file_list->erase(iter);
         }
     }
@@ -556,8 +583,10 @@ void all_disks_after_1s() {
             else {
                 if (disk->disk_state < 60) {
                     disk->disk_state++;
-                } else {
-
+                }
+                // 超过阈值，关闭磁盘
+                else {
+                    disk->disk_state = 0 - disk_start_time;
                 }
             }
         }

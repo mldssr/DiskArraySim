@@ -16,6 +16,15 @@
 #include "data.h"
 #include "req.h"
 
+static void test_file_track() {
+    log.info("Size of FileInfo: %d", sizeof(FileInfo));
+    log.info("Size of File_track: %d", sizeof(File_track));
+    log.info("Size of Req: %d", sizeof(Req));
+}
+
+static void test_record_all_req() {
+    record_all_req();
+}
 
 int main(int argc, char **argv) {
     if (argc < 2) {
@@ -29,6 +38,8 @@ int main(int argc, char **argv) {
 //    gen_req();
 
     get_req();
+//    test_file_track();
+    test_record_all_req();
 
 //    assert(!test_double());
 

@@ -113,7 +113,7 @@ static int test_handle_a_req() {
         log.error("Fail to scan data");
     }
 //    handle_a_req(347, -87, "2016-06-29");
-    handle_a_req(23, -56, "2016-05-05");
+//    handle_a_req(23, -56, "2016-05-05");
     return 0;
 }
 
@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
 
-    test_update_rw_list();
+//    test_update_rw_list();
 
     return 0;
 }
