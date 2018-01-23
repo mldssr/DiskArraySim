@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
             handle_a_req(&iter->second);
             iter++;
             if (iter != req_list.end()) {
-                log.debug("Next req's gen_time: %d", iter->second.gen_time);
+                log.debug("[MAIN ] Next req's gen_time: %d", iter->second.gen_time);
             }
         }
 

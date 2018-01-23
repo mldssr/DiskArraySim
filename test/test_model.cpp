@@ -166,7 +166,7 @@ int main(int argc, char **argv) {
 //    test_size();
 //    test_file_operation();
 //    test_var();
-//    test_handle_a_req();
+    test_handle_a_req();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
 

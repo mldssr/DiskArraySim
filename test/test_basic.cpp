@@ -153,7 +153,7 @@ static void test_time() {
 
 static void test_random() {
     for (int i = 0; i < 10; i++) {
-        printf("%d\n", random(10, 20));
+        printf("%d\n", get_random(10, 20));
     }
     printf("Test random passed!\n");
 }

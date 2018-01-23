@@ -200,7 +200,7 @@ static bool sranded = 0;
 /*
  * 返回[min, max]的随机整数
  */
-int random(int min, int max) {
+int get_random(int min, int max) {
     if (sranded == 0) {
         srand((unsigned) time(NULL));
         sranded = 1;
@@ -209,7 +209,7 @@ int random(int min, int max) {
     return ret;
 }
 
-double random(double min, double max) {
+double get_random(double min, double max) {
     if (sranded == 0) {
         srand((unsigned) time(NULL));
         sranded = 1;

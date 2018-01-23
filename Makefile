@@ -47,9 +47,10 @@ TAPPS := $(basename $(TOBJS))
 
 # all: test
 
-.PHONY: all server test clean
+.PHONY: all sim test clean
 
-server: $(APPS)
+sim: $(APPS)
+	$(BUILD)sim $(PWD)/conf.conf
 
 $(OBJS) $(AOBJS) $(TOBJS): $(BUILD)%.o : %.cpp
 	@mkdir -p $(dir $@)

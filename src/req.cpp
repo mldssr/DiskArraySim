@@ -33,10 +33,11 @@ static int str2days(const char *time) {
  */
 void gen_req() {
     char *req_file = config.get_string("REQ", "ReqFile", "req.csv");
-    char *min_time = config.get_string("REQ", "MinTime", "2016-03-14");
-    char *max_time = config.get_string("REQ", "MaxTime", "2016-08-14");
+    char *min_date = config.get_string("REQ", "MinDate", "2016-03-14");
+    char *max_date = config.get_string("REQ", "MaxDate", "2016-08-14");
     int users = config.get_int("REQ", "Users", 100);
-    int max_days = config.get_int("REQ", "MaxDays", 1);
+    int min_days = config.get_int("REQ", "MinDays", 1);
+    int max_days = config.get_int("REQ", "MaxDays", 154);
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
 
     double ra_min = config.get_double("REQ", "RaMin", 0.0);
@@ -44,37 +45,35 @@ void gen_req() {
     double dec_min = config.get_double("REQ", "DecMin", -87.0);
     double dec_max = config.get_double("REQ", "DecMax", -30.0);
 
-    int start_day = str2days(min_time);
-    int end_day = str2days(max_time);
+    int min_day = str2days(min_date);
+    int max_day = str2days(max_date);
+    log.debug("%d", max_day - min_day + 1);
 
+    log.info("[REQ] Contents in req_list:");
     for (int i = 0; i < users; i++) {
-        log.debug("User %3d", i);
-        int days_per_user = random(1, max_days);
+        int days_per_user = get_random(min_days, max_days);
+        int gen_time = get_random(1, max_req_time);
+        double ra = get_random(ra_min, ra_max);
+        double dec = get_random(dec_min, dec_max);
+        int day = get_random(min_day, max_day - days_per_user + 1);
 
-        int gen_time = random(1, max_req_time);
-        double ra = random(ra_min, ra_max);
-        double dec = random(dec_min, dec_max);
-        int day = random(start_day, end_day - days_per_user + 1);
-
-        // 此用户会产生一系列 gen_time, ra, dec 相同，tg_date 连续的请求
-        for (int j = 0; j < days_per_user; j++) {
-            Req req;
-            req.gen_time = gen_time;
-            req.ra = ra;
-            req.dec = dec;
-            time_t2str((long) (day + j) * 3600 * 24, req.tg_date, 11);
-            req_list.insert(R_PAIR(req.gen_time, req));
-            log.sublog("            gen_time %5d   ra %9.4f   dec %9.4f   tg_date %s\n",
-                    gen_time, ra, dec, req.tg_date);
-        }
+        Req req;
+        req.gen_time = gen_time;
+        req.ra = ra;
+        req.dec = dec;
+        time_t2str((long) (day + 0) * 3600 * 24, req.tg_date_start, 11);
+        time_t2str((long) (day + days_per_user - 1) * 3600 * 24, req.tg_date_end, 11);
+        req_list.insert(R_PAIR(req.gen_time, req));
+        log.sublog("User %3d   gen_time %5d   ra %9.4f   dec %9.4f   tg_date %s ~ %s\n",
+                i, gen_time, ra, dec, req.tg_date_start, req.tg_date_end);
     }
 
     File file(req_file, "w");
-    file.print("gen_time,ra,dec,tg_date\n");
+    file.print("gen_time,ra,dec,tg_date_start,tg_date_end\n");
     R_MAP::iterator iter;
     for (iter = req_list.begin(); iter != req_list.end(); iter++) {
-        file.print("%d,%f,%f,%s\n", iter->second.gen_time, iter->second.ra,
-                iter->second.dec, iter->second.tg_date);
+        file.print("%d,%f,%f,%s,%s\n", iter->second.gen_time, iter->second.ra,
+                iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
     }
 }
 
@@ -82,6 +81,8 @@ void gen_req() {
  * 读取[REQ]部分参数，从csv文件中提取req，到req_list中
  */
 void get_req() {
+    req_list.clear();
+
     char *req_file = config.get_string("REQ", "ReqFile", "req.csv");
     File file(req_file, "r");
 
@@ -101,9 +102,10 @@ void get_req() {
         }
 
         Req req;
-        int ret = sscanf(line, "%d,%lf,%lf,%s\n", &req.gen_time, &req.ra, &req.dec, req.tg_date);
-        if (ret != 4) {
-//            log.info("[REQ] Ignore illegal record: %s", line);
+        int ret = sscanf(line, "%d,%lf,%lf,%10[^,],%10[^,]\n",
+                &req.gen_time, &req.ra, &req.dec, req.tg_date_start, req.tg_date_end);
+        if (ret != 5) {
+            log.info("[REQ] Ignore illegal record: %s", line);
             continue;
         }
 //        log.debug("[%d] %d,%f,%f,%s", ret, req.time, req.ra, req.dec, req.time_str);
@@ -118,25 +120,27 @@ void get_req() {
     }
 
     // 输出 req_list 的内容，调试时使用
-//    log.debug("[req_list] ========================================================================================");
-//    R_MAP::iterator iter;
-//    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
-//        log.debug("%d   %9.4f   %9.4f   %s", iter->second.gen_time, iter->second.ra,
-//                iter->second.dec, iter->second.tg_date);
-//        for (int i = 0; i < MaxFilesPerReq; i++) {
-//            File_track *track = &iter->second.tracks[i];
-//            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
-//                continue;
-//            }
-//            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
-//                    track->file_id, track->res_mom, track->hand_over_mom);
-//        }
-//        log.pure("\n");
-//    }
+    log.debug("[req_list] ========================================================================================");
+    R_MAP::iterator iter;
+    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
+        log.debug("%5d   %9.4f   %9.4f   %s ~ %s", iter->second.gen_time, iter->second.ra,
+                iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
+        for (int i = 0; i < MaxFilesPerReq; i++) {
+            File_track *track = &iter->second.tracks[i];
+            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
+                continue;
+            }
+            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
+                    track->file_id, track->res_mom, track->hand_over_mom);
+        }
+        log.pure("\n");
+    }
 }
 
 /*
  * 将 req 和 file 关联起来
+ * 对于没有相应 file 的 req，不会调用此函数，
+ * 即其 10 个 track 的 file_id === -1，res_mom === -2, hand_over_mom === -2
  */
 void add_file_track(Req *req, int file_id) {
     for (int i = 0; i < MaxFilesPerReq; i++) {
@@ -183,7 +187,9 @@ void hand_over_a_file(int file_id) {
             }
         }
 
+        // 标记 没有file 以及 处理完毕 的 req
         if (all_file_over) {
+            log.debug("[REQ  ] A req (gen_time: %d) marked handed over at exp_time %d.", iter->second.gen_time, exp_time);
             iter->second.hand_over = true;
         }
     }
@@ -195,7 +201,7 @@ void record_all_req() {
     File file(req_track_file, "w");
 
     // 写入第一行
-    file.print("gen_time,ra,dec,tg_date");
+    file.print("gen_time,ra,dec,tg_date_start,tg_date_end");
     for (int i = 0; i < MaxFilesPerReq; i++) {
         // hand_over_mom0, hand_over_mom1, hand_over_mom2...
         file.print(",hom%d", i);
@@ -206,33 +212,29 @@ void record_all_req() {
     R_MAP::iterator iter;
     for (iter = req_list.begin(); iter != req_list.end(); iter++) {
         // 写入基础请求信息
-        file.print("%d,%f,%f,%s", iter->second.gen_time, iter->second.ra,
-                iter->second.dec, iter->second.tg_date);
+        file.print("%d,%f,%f,%s,%s", iter->second.gen_time, iter->second.ra,
+                iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
 
         // 依次写入这个请求所涉及到的文件
-        bool no_file = true;    // 若所有请求都没有匹配文件，会导致这些请求的 hand_over 为 false，修复之
-        int min_hand_over_mom = 0x7fffffff;
+        int max_hand_over_mom = -2;
         for (int i = 0; i < MaxFilesPerReq; i++) {
             int mom = iter->second.tracks[i].hand_over_mom;
-            if (mom >= 0 && mom < min_hand_over_mom) {
-                min_hand_over_mom = mom;
+            if (mom > max_hand_over_mom) {
+                max_hand_over_mom = mom;
             }
             file.print(",%d", mom);
-
-            if (!iter->second.hand_over && iter->second.tracks[i].hand_over_mom > -2) {
-                no_file = false;
-            }
-        }
-        if (!iter->second.hand_over && no_file) {
-            iter->second.hand_over = true;
         }
 
         // 写入 qos，-1 表示尚未完成， 0 表示未匹配到文件
-        int qos = min_hand_over_mom - iter->second.gen_time;
+        int qos = max_hand_over_mom - iter->second.gen_time;
         if (!iter->second.hand_over) {
             qos = -1;
         }
-        if (iter->second.hand_over && min_hand_over_mom == 0x7fffffff) {
+        // 若所有请求都没有匹配文件，则 hand_over_a_file() 一次都没调用，会导致这些请求的 hand_over 为 false，修复之
+        if (!iter->second.hand_over && max_hand_over_mom == -2) {
+            iter->second.hand_over = true;
+        }
+        if (iter->second.hand_over && max_hand_over_mom == -2) {
             qos = 0;
         }
         file.print(",%d\n", qos);

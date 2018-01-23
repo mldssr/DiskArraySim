@@ -58,9 +58,9 @@ time_t str2time_t(const char *time);
 /*
  * 返回[min, max]的随机整数
  */
-int random(int min, int max);
+int get_random(int min, int max);
 
-double random(double min, double max);
+double get_random(double min, double max);
 
 
 #endif /* BASIC_H_ */

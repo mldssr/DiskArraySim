@@ -88,9 +88,9 @@ void del_DiskInfo(DiskInfo *disk) {
 void read_file(FileInfo *file, DiskInfo *disk) {
     disk->rd_file_list->push_back(std::make_pair(trans_time_per_file, *file));
     // 启动磁盘
-    if (disk->disk_state == 0 - disk_start_time) {
-        disk->disk_state++;
-    }
+//    if (disk->disk_state == 0 - disk_start_time) {
+//        disk->disk_state++;
+//    }
 }
 
 /*
@@ -102,9 +102,9 @@ void write_file(FileInfo *file, DiskInfo *disk) {
     disk->left_space -= file->file_size;
     disk->file_num += 1;
     // 启动磁盘
-    if (disk->disk_state == 0 - disk_start_time) {
-        disk->disk_state++;
-    }
+//    if (disk->disk_state == 0 - disk_start_time) {
+//        disk->disk_state++;
+//    }
 }
 
 /*
@@ -200,32 +200,36 @@ int search_all_disks(FileInfo *file) {
     }
 
     // 从开着的（包括正在启动的）disk 中找到最不忙的
-    int cur_tasks = 10000;
+    int min_tasks = 10000;
     int disk_id = -1;
     for (int i = 0; i < data_disk_num; i++) {
         if (has_target[i] && disk_states[i] > 0 - disk_start_time) {
-            if (disk_tasks[i] < cur_tasks) {
+            if (disk_tasks[i] < min_tasks) {
                 disk_id = i;
-                cur_tasks = disk_tasks[i];
+                min_tasks = disk_tasks[i];
             }
         }
     }
-    if (cur_tasks < 10000)
+    if (min_tasks < 10000) {
+        log.debug("[SR_AL] Found in opened disk %d.", disk_id);
         return disk_id;
+    }
 
     // 从关着的 disk 中找到最忙的
-    cur_tasks = -1;
+    int max_tasks = -1;
     disk_id = -1;
     for (int i = 0; i < data_disk_num; i++) {
         if (has_target[i] && disk_states[i] == 0 - disk_start_time) {
-            if (disk_tasks[i] > cur_tasks) {
+            if (disk_tasks[i] > max_tasks) {
                 disk_id = i;
-                cur_tasks = disk_tasks[i];
+                max_tasks = disk_tasks[i];
             }
         }
     }
-    if (cur_tasks > -1)
+    if (max_tasks > -1) {
+        log.debug("[SR_AL] Found in closed disk %d.", disk_id);
         return disk_id;
+    }
 
     return -1;
 }
@@ -361,12 +365,12 @@ double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t 
  */
 int handle_a_req(Req *req) {
     // 获取目标天的 time_t 范围
-    char *start_time = stradd(req->tg_date, " 00:00:00");
-    time_t start = str2time_t(start_time);
-    delete start_time;
-    char *end_time = stradd(req->tg_date, " 23:59:59");
-    time_t end = str2time_t(end_time);
-    delete end_time;
+    char *start_date = stradd(req->tg_date_start, " 00:00:00");
+    time_t start = str2time_t(start_date);
+    delete start_date;
+    char *end_date = stradd(req->tg_date_end, " 23:59:59");
+    time_t end = str2time_t(end_date);
+    delete end_date;
 
     // 用来记录每个磁盘 涉及到的文件数 和 实际目标的文件数
     int search_files[data_disk_num];
@@ -408,8 +412,10 @@ int handle_a_req(Req *req) {
 //                target_file, total_search, disk->disk_id, disk->file_num);
     }// END 遍历所有DataDisk，找到所有符合条件的 file，存到 target_file_map
 
+    // 记录这次 req 的处理情况
     log.info("[MODEL] ======================================== Request Summary ========");
-    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  time %s\n", req->ra, req->dec, req->tg_date);
+    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  date %s ~ %s\n",
+            req->ra, req->dec, req->tg_date_start, req->tg_date_end);
     log.sublog("[MODEL] disk_id    total_files    search_files    target_files\n");
     for (int i = 0; i < data_disk_num; i++) {
         log.sublog("[MODEL] %7d    %11d    %12d    %12d\n",
@@ -425,10 +431,12 @@ int handle_a_req(Req *req) {
     else
         log.info("[MODEL] No file to return.");
 
+    // 处理相应文件
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
         // 处理文件
+        log.sublog("[ %2d  ] file_quality: %f\n", index, rit->first);
         show_file(&rit->second);
         int disk_id = search_all_disks(&rit->second);
         read_file(&rit->second, data_disk_array[disk_id]);
@@ -543,11 +551,13 @@ void update_rd_list(DiskInfo *disk) {
     }
 }
 
-static void update_all_rw_list() {
-    for (int i = 0; i < data_disk_num; i++) {
-        update_wt_list(data_disk_array[i]);
-        update_rd_list(data_disk_array[i]);
-    }
+static void update_rw_list(DiskInfo *disk) {
+    update_wt_list(disk);
+    update_rd_list(disk);
+}
+
+static inline bool not_busy(DiskInfo *disk) {
+    return disk->rd_file_list->empty() && disk->wt_file_list->empty();
 }
 
 void all_disks_after_1s() {
@@ -555,27 +565,30 @@ void all_disks_after_1s() {
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
         int state = disk->disk_state;
-        // 磁盘处于关闭状态
-        if (state == 0 - disk_start_time) {
-            continue;
+        // 磁盘处于关闭状态，无读写任务
+        if (state == 0 - disk_start_time && not_busy(disk)) {
+        }
+        // 磁盘处于关闭状态，有读写任务，则开启磁盘
+        else if (state == 0 - disk_start_time && !not_busy(disk)) {
+            disk->disk_state++;
         }
         // 磁盘尚未完全开启
         else if (state < 0) {
             disk->disk_state++;
         }
         // 磁盘完全开启，有读写任务
-        else if (disk->wt_file_list->size() > 0 || disk->rd_file_list->size() > 0) {
+        else if (!not_busy(disk)) {
             // 如果磁盘已经在工作
             if (state == 0) {
             }
-            // 如果磁盘空转
+            // 如果磁盘空转，将其置为忙碌状态
             else {
                 disk->disk_state = 0;
             }
             // 处理读写任务
-            update_all_rw_list();
+            update_rw_list(disk);
         }
-        // 磁盘完全开启，无读写任务，更新 busy_time
+        // 磁盘完全开启，无读写任务，更新 disk_state (busy_time)
         else {
             // 如果磁盘在工作状态，标志其为空闲状态
             if (state == 0) {

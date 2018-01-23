@@ -20,7 +20,8 @@ struct Req {
     int gen_time;               // 请求生成时间
     double ra;
     double dec;
-    char tg_date[11];          // target_date, 例如 "2017-03-11"
+    char tg_date_start[11];          // target_date, 例如 "2017-03-11"，从 00:00:00 起算
+    char tg_date_end[11];            // target_date, 例如 "2017-03-11"，到 23:59:59 截止
 
     // 记录 Req 所涉及的 file 的处理情况
     bool hand_over;             // 是否已经处理完毕
