@@ -16,13 +16,13 @@
 #include "data.h"
 #include "req.h"
 
-static void test_file_track() {
+void test_file_track() {
     log.info("Size of FileInfo: %d", sizeof(FileInfo));
     log.info("Size of File_track: %d", sizeof(File_track));
     log.info("Size of Req: %d", sizeof(Req));
 }
 
-static void test_record_all_req() {
+void test_record_all_req() {
     record_all_req();
 }
 
@@ -35,11 +35,11 @@ int main(int argc, char **argv) {
     char *log_dir = config.get_string("LOG", "TestLogDir", "build/test_logs");
     log.init(log_dir);      // 初始化日志模块
 
-//    gen_req();
+    gen_req();
 
-    get_req();
+//    get_req();
 //    test_file_track();
-    test_record_all_req();
+//    test_record_all_req();
 
 //    assert(!test_double());
 

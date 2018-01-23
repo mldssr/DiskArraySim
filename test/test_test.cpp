@@ -23,7 +23,7 @@
 
 using namespace std;
 
-static void test_read_file() {
+void test_read_file() {
     struct dirent *ptr;
     DIR *dir;
     dir = opendir("./data");
@@ -37,7 +37,7 @@ static void test_read_file() {
     closedir(dir);
 }
 
-static int test_up_lower_bound() {
+int test_up_lower_bound() {
     std::map<char, int> mymap;
     std::map<char, int>::iterator itlow, itup;
 
@@ -90,7 +90,7 @@ static int test_up_lower_bound() {
     return 0;
 }
 
-static void test_read_data() {
+void test_read_data() {
 //    File file("./AST3-2.obs.log.20160000.txt", "r");
     char buf[6][200];
     buf[5][0] = 0;
@@ -107,7 +107,7 @@ static void test_read_data() {
     }
 }
 
-static void test_EOF() {
+void test_EOF() {
     FILE * pFile;
     int c;
     int n = 0;
@@ -126,7 +126,7 @@ static void test_EOF() {
     }
 }
 
-static void test_random() {
+void test_random() {
     srand(1);
     for (int i = 0; i < 5; i++) {
         srand(1);
@@ -147,7 +147,7 @@ static void test_random() {
     printf("RAND_MAX: %lu\n", RAND_MAX);
 }
 
-static void test_stl_list() {
+void test_stl_list() {
     std::list<std::pair<int, int>> mylist;
     std::list<std::pair<int, int>>::iterator iter;
     for (int i = 1; i <= 5; ++i) {

@@ -22,7 +22,7 @@
 
 #define LEN        256
 
-static int test_size() {
+int test_size() {
     DiskInfo *disk = new_DiskInfo(0, 0, 2000000);
     FileInfo *file0 = new_FileInfo(0, 500, 34, -46, 0);
     FileInfo *file1 = new_FileInfo(1, 450, 12, 1, 0);
@@ -63,7 +63,7 @@ static int test_size() {
 /*
  * 测试 read_file(), write_file(), delete_file(), search_file(), copy_file(), move_file(),
  */
-static int test_file_operation() {
+int test_file_operation() {
     DiskInfo *disk0 = new_DiskInfo(0, 0, 2000000);
     DiskInfo *disk1 = new_DiskInfo(0, 0, 2000000);
     FileInfo *file0 = new_FileInfo(0, 500, 34, -46, 0);
@@ -103,12 +103,12 @@ static int test_file_operation() {
     return 0;
 }
 
-static void test_var() {
+void test_var() {
     log.info("file_id_num: %d", file_id_num);
     log.info("data_disk_num: %d", data_disk_num);
 }
 
-static int test_handle_a_req() {
+int test_handle_a_req() {
     if (scan_data("data") != 0) {
         log.error("Fail to scan data");
     }
@@ -117,7 +117,7 @@ static int test_handle_a_req() {
     return 0;
 }
 
-static int test_update_rw_list() {
+int test_update_rw_list() {
     DiskInfo *disk0 = new_DiskInfo(0, -5, 2000000);
     DiskInfo *disk1 = new_DiskInfo(0, -5, 2000000);
     FileInfo *file0 = new_FileInfo(0, 500, 34, -46, 0);

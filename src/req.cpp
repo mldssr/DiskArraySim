@@ -48,7 +48,7 @@ void gen_req() {
     int end_day = str2days(max_time);
 
     for (int i = 0; i < users; i++) {
-        log.debug("User %d", i);
+        log.debug("User %3d", i);
         int days_per_user = random(1, max_days);
 
         int gen_time = random(1, max_req_time);
@@ -56,14 +56,16 @@ void gen_req() {
         double dec = random(dec_min, dec_max);
         int day = random(start_day, end_day - days_per_user + 1);
 
+        // 此用户会产生一系列 gen_time, ra, dec 相同，tg_date 连续的请求
         for (int j = 0; j < days_per_user; j++) {
-            log.debug("User %d, day %d", i, j);
             Req req;
             req.gen_time = gen_time;
             req.ra = ra;
             req.dec = dec;
             time_t2str((long) (day + j) * 3600 * 24, req.tg_date, 11);
             req_list.insert(R_PAIR(req.gen_time, req));
+            log.sublog("            gen_time %5d   ra %9.4f   dec %9.4f   tg_date %s\n",
+                    gen_time, ra, dec, req.tg_date);
         }
     }
 

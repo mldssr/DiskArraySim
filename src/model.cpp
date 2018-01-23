@@ -420,8 +420,10 @@ int handle_a_req(Req *req) {
 
     if (total_files > MaxFilesPerReq)
         log.info("[MODEL] Now return the top %d correlate files.", MaxFilesPerReq);
-    else
+    else if (total_files > 0)
         log.info("[MODEL] Now return all %d target files.", total_files);
+    else
+        log.info("[MODEL] No file to return.");
 
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
