@@ -33,9 +33,9 @@ int main(int argc, char **argv) {
     record_disk_state_init();
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
     R_MAP::iterator iter = req_list.begin();
-    while(exp_time < max_req_time + 1000) {
+    while((exp_time < max_req_time + 1) || (!time_to_shut_down())) {
 //        log.debug("exp_time: %d", exp_time);
-        // 处理请求
+        // 处理这一秒的所有请求
         while (iter->second.gen_time == exp_time) {
             handle_a_req(&iter->second);
             iter++;

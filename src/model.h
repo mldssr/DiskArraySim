@@ -110,6 +110,8 @@ void record_disk_state();
 void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);
 
+bool time_to_shut_down();
+
 /*
  * 经过1s后，更新所有disk的状态
  */

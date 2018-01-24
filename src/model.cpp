@@ -560,6 +560,20 @@ static inline bool not_busy(DiskInfo *disk) {
     return disk->rd_file_list->empty() && disk->wt_file_list->empty();
 }
 
+/*
+ * 所有磁盘没有读写任务，且都已经关闭
+ */
+bool time_to_shut_down() {
+    bool ret = true;
+    // 若有磁盘 有任务 或者 无任务但尚未关闭，返回 false
+    for (int i = 0; i < data_disk_num; i++) {
+        if (!not_busy(data_disk_array[i]) || data_disk_array[i]->disk_state != 0 - disk_start_time) {
+            ret = false;
+        }
+    }
+    return ret;
+}
+
 void all_disks_after_1s() {
     DiskInfo *disk;
     for (int i = 0; i < data_disk_num; i++) {
