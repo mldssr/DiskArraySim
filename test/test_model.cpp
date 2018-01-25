@@ -154,6 +154,25 @@ int test_update_rw_list() {
     return 0;
 }
 
+void test_key() {
+    Key key0(0, 1, 3600);
+    Key key1(0, 1, 3600);
+    Key key2(2, 3, 7200);
+
+    Key key3 = key0;
+
+    log.debug("key0 == key1? %d", key0 == key1);
+    log.debug("key0 == key2? %d", key0 == key2);
+    log.debug("key0 == key3? %d", key0 == key3);
+
+    key3.time = 0;
+    log.debug("key0 == key3? %d", key0 == key3);
+
+    log.debug("Size of Key: %d.", sizeof(Key));
+    log.debug("Size of double: %d.", sizeof(double));
+    log.debug("Size of time_t: %d.", sizeof(time_t));
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Need a parameter of profile!");
@@ -166,9 +185,10 @@ int main(int argc, char **argv) {
 //    test_size();
 //    test_file_operation();
 //    test_var();
-    test_handle_a_req();
+//    test_handle_a_req();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
+    test_key();
 
 //    test_update_rw_list();
 

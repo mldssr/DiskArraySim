@@ -24,7 +24,8 @@ UTILS := basic.cpp file.cpp log.cpp \
 FILES := $(addprefix utils/,$(UTILS)) \
 		model.cpp \
 		data.cpp \
-		req.cpp
+		req.cpp \
+		corr.cpp
 AFILES := sim.cpp
 TFILES := test_basic.cpp \
 		test_file.cpp \
@@ -36,7 +37,8 @@ TFILES := test_basic.cpp \
 		test_model.cpp \
 		test_test.cpp \
 		test_data.cpp \
-		test_req.cpp
+		test_req.cpp \
+		test_corr.cpp
 
 OBJS := $(addprefix $(BUILD),$(subst .cpp,.o,$(FILES)))
 AOBJS := $(addprefix $(BUILD),$(subst .cpp,.o,$(AFILES)))
@@ -59,7 +61,7 @@ $(OBJS) $(AOBJS) $(TOBJS): $(BUILD)%.o : %.cpp
 $(APPS) $(TAPPS): % : %.o $(OBJS)
 	$(CXX) $^ -o $@ $(LIBFLAGS)
 
-test: server $(basename $(TFILES))
+test: sim $(basename $(TFILES))
 
 .PHONY: $(basename $(TFILES))
 
@@ -96,6 +98,9 @@ test_data: $(BUILD)test_data
 
 test_req: $(BUILD)test_req
 	$(BUILD)test_req $(PWD)/conf.conf
+
+test_corr: $(BUILD)test_corr
+	$(BUILD)test_corr $(PWD)/conf.conf
 
 .PHONY: build_dir pre_pkg deb
 

@@ -12,13 +12,11 @@
 #include "utils/file.h"
 #include "utils/config.h"
 #include "model.h"
+#include "corr.h"
 //#include "req.h"
 
 // 实验中的模拟计时，从 0 开始，每秒加 1
 int exp_time = 0;
-// 日志：记录每秒钟所有磁盘的状态
-char *disk_state_track_file = config.get_string("TRACK", "DiskStateTrackFile", "disk_state_track.csv");
-File track_state(disk_state_track_file, "w");
 
 // 视场的长度与宽度，也是请求天区的长宽
 int length = 3;
@@ -442,6 +440,9 @@ int handle_a_req(Req *req) {
         read_file(&rit->second, data_disk_array[disk_id]);
         add_file_track(req, rit->second.file_id);
 
+        // 记录到 corr 模块
+        record_req_file(&rit->second, exp_time);
+
         // 只处理最相关的前 [MaxFilesPerReq] 个文件
         index++;
         if (index == MaxFilesPerReq)
@@ -499,24 +500,37 @@ void show_all_disks() {
     }
 }
 
-void record_disk_state_init() {
+// 日志：记录每秒钟所有磁盘的状态
+File *track_state = NULL;
+
+static void record_disk_state_init() {
+    char *disk_state_track_file = config.get_string("TRACK", "DiskStateTrackFile", "disk_state_track.csv");
+    track_state = new File(disk_state_track_file, "w");
     // 写入第一行
-    track_state.print("time");
+    track_state->print("time");
     for (int i = 0; i < data_disk_num; i++) {
-        // hand_over_mom0, hand_over_mom1, hand_over_mom2...
-        track_state.print(",disk_%d", i);
+        // disk_0, disk_1, disk_2, ...
+        track_state->print(",disk_%d", i);
     }
-    track_state.print("\n");
+    track_state->print("\n");
 }
 
 void record_disk_state() {
+    if (track_state == NULL) {
+        record_disk_state_init();
+    }
     // 写入时间
-    track_state.print("%d", exp_time);
+    track_state->print("%d", exp_time);
     // 写入当前磁盘状态
     for (int i = 0; i < data_disk_num; i++) {
-        track_state.print(",%d", data_disk_array[i]->disk_state);
+        track_state->print(",%d", data_disk_array[i]->disk_state);
     }
-    track_state.print("\n");
+    track_state->print("\n");
+}
+
+void record_disk_state_end() {
+    delete track_state;
+    track_state = NULL;
 }
 
 void update_wt_list(DiskInfo *disk) {

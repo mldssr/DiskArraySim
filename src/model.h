@@ -46,8 +46,8 @@ struct FileInfo {
     double dec;                 // 赤纬(Declination), -90 ~ +90
     time_t time;
 
-    Key cor_files[5];           // 相关文件列表，若本文件被命中，其相关文件的 hit_prob 增大
-    int hit_prob;               // 指示本文件被命中的概率
+//    Key cor_files[5];           // 相关文件列表，若本文件被命中，其相关文件的 hit_prob 增大
+//    int hit_prob;               // 指示本文件被命中的概率
 };
 
 struct DiskInfo {
@@ -104,8 +104,8 @@ void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
 
-void record_disk_state_init();
 void record_disk_state();
+void record_disk_state_end();
 
 void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);

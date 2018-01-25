@@ -9,6 +9,7 @@
 #include "model.h"
 #include "data.h"
 #include "req.h"
+#include "corr.h"
 
 int main(int argc, char **argv) {
     // 初始化配置文件
@@ -30,7 +31,6 @@ int main(int argc, char **argv) {
     get_req();
 
     // 运行
-    record_disk_state_init();
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
     R_MAP::iterator iter = req_list.begin();
     while((exp_time < max_req_time + 1) || (!time_to_shut_down())) {
@@ -46,10 +46,17 @@ int main(int argc, char **argv) {
 
         all_disks_after_1s();
         record_disk_state();
+        cal_data_disk_hit_prob();
+        record_disk_hit_prob();
         exp_time++;
     }
 
     record_all_req();
+
+    record_disk_state_end();
+    record_disk_hit_prob_end();
+
+    show_corrs();
 
     return 0;
 }
