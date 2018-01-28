@@ -150,7 +150,7 @@ int search_file(FileInfo *file, DiskInfo *disk) {
     MAP *file_list = disk->file_list;
     MAP::iterator iter = file_list->find(key);
     if (iter != file_list->end()) {
-        log.info("[SERCH] Found in disk %d.", disk->disk_id);
+//        log.info("[SERCH] Found in disk %d.", disk->disk_id);
         return 1;
     }
 
@@ -161,8 +161,8 @@ int search_file(FileInfo *file, DiskInfo *disk) {
         if (file->ra == list_iter->second.ra
                 && file->dec == list_iter->second.dec
                 && file->time == list_iter->second.time) {
-            log.info("[SERCH] Found in disk %d, but it is being transferring.",
-                    disk->disk_id);
+//            log.info("[SERCH] Found in disk %d, but it is being transferring.",
+//                    disk->disk_id);
         }
         return 2;
     }
@@ -288,6 +288,7 @@ void add_file_init(FileInfo *file, DiskInfo *disk) {
     disk->file_num += 1;
 }
 
+int data_disk_preserved_space = config.get_int("DATA", "DataDiskPreservedSpace", 200000);
 /*
  * 将 file 按顺序自动放入 DataDisks
  * 即将其放入最后一块空闲的 dataDisk，如果满了再启动下一块
@@ -302,8 +303,8 @@ int add_file(FileInfo *file) {
                 config.get_int("DATA", "DataDiskSize", 2000000));
         data_disk_num++;
     }
-    // 当前disk空间不足
-    if (data_disk_array[data_disk_num - 1]->left_space <= file->file_size) {
+    // 当前 disk 剩余空间不足预留空间
+    if (data_disk_array[data_disk_num - 1]->left_space <= data_disk_preserved_space) {
         if (data_disk_num >= config.get_int("DATA", "DataDiskMaxNum", 100)) {
             log.error("[MODEL] No extra DataDisks to hold more data!");
             return 1;
@@ -501,36 +502,57 @@ void show_all_disks() {
 }
 
 // 日志：记录每秒钟所有磁盘的状态
-File *track_state = NULL;
+File *shot = NULL;
 
-static void record_disk_state_init() {
-    char *disk_state_track_file = config.get_string("TRACK", "DiskStateTrackFile", "disk_state_track.csv");
-    track_state = new File(disk_state_track_file, "w");
+static void snapshot_init() {
+    char *snap_shot_file = config.get_string("TRACK", "SnapshotFile", "snapshot.csv");
+    shot = new File(snap_shot_file, "w");
     // 写入第一行
-    track_state->print("time");
+    shot->print("time");
     for (int i = 0; i < data_disk_num; i++) {
         // disk_0, disk_1, disk_2, ...
-        track_state->print(",disk_%d", i);
+        shot->print(",disk_%d", i);
     }
-    track_state->print("\n");
+    shot->print(", ");
+    for (int i = 0; i < data_disk_num; i++) {
+        // tasks_0, tasks_1, tasks_2, ...
+        shot->print(",tasks_%d", i);
+    }
+    shot->print(", ");
+    for (int i = 0; i < data_disk_num; i++) {
+        // prob_0, prob_1, prob_2, ...
+        shot->print(",prob_%d", i);
+    }
+    shot->print("\n");
 }
 
-void record_disk_state() {
-    if (track_state == NULL) {
-        record_disk_state_init();
+void snapshot() {
+    if (shot == NULL) {
+        snapshot_init();
     }
     // 写入时间
-    track_state->print("%d", exp_time);
-    // 写入当前磁盘状态
+    shot->print("%d", exp_time);
+    // 写入当前各个磁盘状态
     for (int i = 0; i < data_disk_num; i++) {
-        track_state->print(",%d", data_disk_array[i]->disk_state);
+        shot->print(",%d", data_disk_array[i]->disk_state);
     }
-    track_state->print("\n");
+    // 写入当前各个磁盘任务数
+    shot->print(", ");
+    for (int i = 0; i < data_disk_num; i++) {
+        int tasks = data_disk_array[i]->rd_file_list->size() + data_disk_array[i]->wt_file_list->size();
+        shot->print(",%d", tasks);
+    }
+    // 写入各个磁盘命中概率
+    shot->print(", ");
+    for (int i = 0; i < data_disk_num; i++) {
+        shot->print(",%f", data_disk_hit_prob[i]);
+    }
+    shot->print("\n");
 }
 
-void record_disk_state_end() {
-    delete track_state;
-    track_state = NULL;
+void snapshot_end() {
+    delete shot;
+    shot = NULL;
 }
 
 void update_wt_list(DiskInfo *disk) {

@@ -104,8 +104,8 @@ void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
 
-void record_disk_state();
-void record_disk_state_end();
+void snapshot();
+void snapshot_end();
 
 void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);

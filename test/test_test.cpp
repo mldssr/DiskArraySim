@@ -111,7 +111,7 @@ void test_EOF() {
     FILE * pFile;
     int c;
     int n = 0;
-    pFile = fopen("./test.txt", "r");
+    pFile = fopen("./test/test.txt", "r");
     if (pFile == NULL)
         perror("Error opening file");
     else {

@@ -176,6 +176,9 @@ void show_corrs() {
 int max_num = config.get_int("DATA", "DataDiskMaxNum", 100);
 double *data_disk_hit_prob = new double[max_num]();
 
+/*
+ * 由近期内被访问的文件，推测磁盘的命中概率
+ */
 void cal_data_disk_hit_prob() {
     // 重置 data_disk_hit_prob
 //    memset(data_disk_hit_prob, 0, max_num * sizeof(double));
@@ -226,6 +229,7 @@ static void record_disk_hit_prob_init() {
         // disk_0, disk_1, disk_2, ...
         track_hit_prob->print(",disk_%d", i);
     }
+    track_hit_prob->print(", ");
     for (int i = 0; i < data_disk_num; i++) {
         // prob_0, prob_1, prob_2, ...
         track_hit_prob->print(",prob_%d", i);
@@ -247,6 +251,8 @@ void record_disk_hit_prob() {
     for (int i = 0; i < data_disk_num; i++) {
         track_hit_prob->print(",%d", data_disk_array[i]->disk_state);
     }
+    // 写入各个磁盘命中概率
+    track_hit_prob->print(", ");
     for (int i = 0; i < data_disk_num; i++) {
         track_hit_prob->print(",%f", data_disk_hit_prob[i]);
     }

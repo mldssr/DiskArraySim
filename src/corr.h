@@ -57,6 +57,7 @@ void show_corrs();
  */
 extern double *data_disk_hit_prob;
 void cal_data_disk_hit_prob();
+// 弃用
 void record_disk_hit_prob();
 void record_disk_hit_prob_end();
 

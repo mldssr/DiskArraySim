@@ -45,16 +45,16 @@ int main(int argc, char **argv) {
         }
 
         all_disks_after_1s();
-        record_disk_state();
         cal_data_disk_hit_prob();
-        record_disk_hit_prob();
+//        record_disk_hit_prob();
+        snapshot();
         exp_time++;
     }
 
     record_all_req();
 
-    record_disk_state_end();
-    record_disk_hit_prob_end();
+    snapshot_end();
+//    record_disk_hit_prob_end();
 
     show_corrs();
 

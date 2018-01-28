@@ -118,36 +118,58 @@ int scan_data(const char *dir) {
  * 工具：分析 data_disk_array 中的数据，将结果写入到 footprint.txt
  */
 void footprint() {
+    File file("footprint.txt", "w");
+    file.print("  disk,    ra_min,    ra_max,   dec_min,   dec_max\n");
+
     double ra_min = 360.0;
     double ra_max = 0.0;
     double dec_min = 90.0;
     double dec_max = -90.0;
 
     for (int i = 0; i < data_disk_num; i++) {
+        // 用来统计这个磁盘上的范围
+        double sub_ra_min = 360.0;
+        double sub_ra_max = 0.0;
+        double sub_dec_min = 90.0;
+        double sub_dec_max = -90.0;
+
         // 只考虑 file_list
         MAP* file_list = data_disk_array[i]->file_list;
         MAP::iterator iter;
         for (iter = file_list->begin(); iter != file_list->end(); iter++) {
             double ra = iter->second.ra;
             double dec = iter->second.dec;
-            if (ra < ra_min) {
-                ra_min = ra;
+            // 更新这个磁盘的范围
+            if (ra < sub_ra_min) {
+                sub_ra_min = ra;
             }
-            if (ra > ra_max) {
-                ra_max = ra;
+            if (ra > sub_ra_max) {
+                sub_ra_max = ra;
             }
-            if (dec < dec_min) {
-                dec_min = dec;
+            if (dec < sub_dec_min) {
+                sub_dec_min = dec;
             }
-            if (dec > dec_max) {
-                dec_max = dec;
+            if (dec > sub_dec_max) {
+                sub_dec_max = dec;
             }
+        }
+        file.print("disk_%d, %9.4f, %9.4f, %9.4f, %9.4f\n", i, sub_ra_min, sub_ra_max, sub_dec_min, sub_dec_max);
+
+        // 更新全局范围
+        if (sub_ra_min < ra_min) {
+            ra_min = sub_ra_min;
+        }
+        if (sub_ra_max > ra_max) {
+            ra_max = sub_ra_max;
+        }
+        if (sub_dec_min < dec_min) {
+            dec_min = sub_dec_min;
+        }
+        if (sub_dec_max > dec_max) {
+            dec_max = sub_dec_max;
         }
     }
 
-    File file("footprint.txt", "w");
-    file.print("ra_min: %9.4f\n", ra_min);
-    file.print("ra_max: %9.4f\n", ra_max);
-    file.print("dec_min: %9.4f\n", dec_min);
-    file.print("dec_max: %9.4f\n", dec_max);
+    file.print("\n");
+    file.print(" whole, %9.4f, %9.4f, %9.4f, %9.4f\n", ra_min, ra_max, dec_min, dec_max);
 }
