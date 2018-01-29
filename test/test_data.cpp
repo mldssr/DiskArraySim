@@ -20,6 +20,7 @@ void test_parse_file(const char *file_name) {
     if (parse_file(file_name) != 0) {
         log.error("Fail to parse_file");
     }
+    show_all_disks();
 }
 
 void test_scan_data(const char *dir) {
@@ -42,10 +43,10 @@ int main(int argc, char **argv) {
     log.init(log_dir);      // 初始化日志模块
 
     const char *data_name = "./AST3-2.obs.log.20160000.txt";
-//    test_parse_file(data_name);
+    test_parse_file(data_name);
 
-    test_scan_data("data");
-    test_footprint();
+//    test_scan_data("data");
+//    test_footprint();
 
 //    show_all_disks();
 //    assert(!test_double());

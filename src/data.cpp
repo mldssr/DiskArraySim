@@ -19,21 +19,27 @@
  * @return 0-success, 1-failed
  */
 int parse_file(const char *file_name) {
-    File file(file_name, "r");
+    File obs_log(file_name, "r");
     char line[200];
     char buf[6][100];
     double ra, dec;
     time_t time;
     struct tm* tmp_time = new tm;
+    int file_size = config.get_int("DATA", "FileSize", 200);
+    // 数据扩充的倍数，例如，为 10 时表示两个真实数据之间等间隔地插入 9 个扩充数据
+    int multiple = config.get_int("DATA", "Multiple", 1);
+    static FileInfo *file_pre = NULL;       // 指向上一次的 file
+    static FileInfo *file_now = NULL;       // 指向这次的 file
+
     // 读取表头
     // FILENAME       TYPE            RA       DEC      exptime DATE
-    file.readline(line, 200);
+    obs_log.readline(line, 200);
 
-    while (!file.is_eof()) {
+    while (!obs_log.is_eof()) {
         // 读取一行记录
         // b160406.000001.fits             FLAT  226.5075 -72.6075    3.00 2016-04-07T01:37:04
         memset(line, 0, sizeof(line));
-        file.readline(line, 200);
+        obs_log.readline(line, 200);
         // 处理完最后一行后还会进入一次循环，读取到空字符串，排除之
         if (strlen(line) == 0) {
             continue;
@@ -65,11 +71,44 @@ int parse_file(const char *file_name) {
             continue;
         }
 
-        FileInfo *file = new_FileInfo(file_id_num++,
-                config.get_int("DATA", "FileSize", 200), ra, dec, time);
-        add_file(file);
+        // 扩充数据：添加 file_pre 和 file_now 之间的多个 file
+        if (file_pre != NULL && !(ra == file_pre->ra && dec == file_pre->dec)) {
+            double base_weight = 1.0 / multiple;
+            for (int i = 0; i < multiple; i++) {
+                // 等距地插入新 file
+                if (i < multiple - 1) {
+                    double former_weight = base_weight * (multiple - 1 - i);
+                    double latter_weight = base_weight * (1 + i);
+                    double this_ra = file_pre->ra * former_weight + ra * latter_weight;
+                    double this_dec = file_pre->dec * former_weight + dec * latter_weight;
+                    time_t this_time = file_pre->time * former_weight + time * latter_weight;
+
+                    file_now = new_FileInfo(file_id_num++, file_size, this_ra, this_dec, this_time);
+                    add_file(file_now);
+                    delete file_now;
+                }
+                // 最后一个 file 用读取到的 ra, dec, time，而不是 计算出的 this_ra, this_dec, this_time
+                // 否则有可能因 double 类型比较问题造成遇到了前后两个相同的文件时，
+                // 造成 ra ！= file_pre->ra 或 dec != file_pre->dec，进而误插新的 file
+                // 记住：16.1 * 100 + 0.9 * 100 ！= 17.0 * 100
+                else {
+                    file_now = new_FileInfo(file_id_num++, file_size, ra, dec, time);
+                    add_file(file_now);
+                }
+            }
+            delete file_pre;
+            file_pre = file_now;
+        }
+        // 只添加这次的 file，可能是第一次，也可能是遇到了前后两个相同的文件
+        else {
+            file_now = new_FileInfo(file_id_num++, file_size, ra, dec, time);
+            add_file(file_now);
+            if (file_pre != NULL) {
+                delete file_pre;
+            }
+            file_pre = file_now;
+        }
 //        show_file(file);
-        delete file;
     }
     delete tmp_time;
     return 0;
