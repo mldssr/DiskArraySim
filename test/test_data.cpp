@@ -42,11 +42,11 @@ int main(int argc, char **argv) {
     char *log_dir = config.get_string("LOG", "TestLogDir", "build/test_logs");
     log.init(log_dir);      // 初始化日志模块
 
-    const char *data_name = "./AST3-2.obs.log.20160000.txt";
-    test_parse_file(data_name);
+    const char *data_name = "./test/AST3-2.obs.log.20160000.txt";
+//    test_parse_file(data_name);
 
-//    test_scan_data("data");
-//    test_footprint();
+    test_scan_data("data");
+    test_footprint();
 
 //    show_all_disks();
 //    assert(!test_double());

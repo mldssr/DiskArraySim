@@ -26,6 +26,7 @@ int parse_file(const char *file_name) {
     time_t time;
     struct tm* tmp_time = new tm;
     int file_size = config.get_int("DATA", "FileSize", 200);
+    char *type = config.get_string("DATA", "Type", "all");
     // 数据扩充的倍数，例如，为 10 时表示两个真实数据之间等间隔地插入 9 个扩充数据
     int multiple = config.get_int("DATA", "Multiple", 1);
     static FileInfo *file_pre = NULL;       // 指向上一次的 file
@@ -69,6 +70,13 @@ int parse_file(const char *file_name) {
         if (ra < 0.0 || ra > 360.0 || dec < -90.0 || dec > 90.0) {
 //            log.sublog("[DATA] Invalid data from %s.\n", file_name);
             continue;
+        }
+
+        // 过滤掉不符的类型
+        if (strcmp(type, "all") != 0) {
+            if (strcmp(type, buf[1]) != 0) {
+                continue;
+            }
         }
 
         // 扩充数据：添加 file_pre 和 file_now 之间的多个 file
@@ -119,7 +127,7 @@ int parse_file(const char *file_name) {
  * @return 0-success, 1-failed
  */
 int scan_data(const char *dir) {
-    const char *file_list = "files_list.txt";
+    const char *file_list = "./build/files_list.txt";
     // 获取dir文件夹中所有文件名，存到 files_list.txt 中
     if (system_call("ls -al %s | awk 'NR>3 {print $9}' > %s", dir, file_list) != 0) {
         log.error("[DATA] Fail to get file list of DIR [%s].", dir);
@@ -157,7 +165,7 @@ int scan_data(const char *dir) {
  * 工具：分析 data_disk_array 中的数据，将结果写入到 footprint.txt
  */
 void footprint() {
-    File file("footprint.txt", "w");
+    File file("./track/footprint.txt", "w");
     file.print("  disk,    ra_min,    ra_max,   dec_min,   dec_max\n");
 
     double ra_min = 360.0;
@@ -192,7 +200,7 @@ void footprint() {
                 sub_dec_max = dec;
             }
         }
-        file.print("disk_%d, %9.4f, %9.4f, %9.4f, %9.4f\n", i, sub_ra_min, sub_ra_max, sub_dec_min, sub_dec_max);
+        file.print("disk_%02d, %9.4f, %9.4f, %9.4f, %9.4f\n", i, sub_ra_min, sub_ra_max, sub_dec_min, sub_dec_max);
 
         // 更新全局范围
         if (sub_ra_min < ra_min) {
@@ -210,5 +218,5 @@ void footprint() {
     }
 
     file.print("\n");
-    file.print(" whole, %9.4f, %9.4f, %9.4f, %9.4f\n", ra_min, ra_max, dec_min, dec_max);
+    file.print("  whole, %9.4f, %9.4f, %9.4f, %9.4f\n", ra_min, ra_max, dec_min, dec_max);
 }

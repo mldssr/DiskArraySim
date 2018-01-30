@@ -46,6 +46,8 @@ struct FileInfo {
     double dec;                 // 赤纬(Declination), -90 ~ +90
     time_t time;
 
+    int hit_count;              // 命中次数
+
 //    Key cor_files[5];           // 相关文件列表，若本文件被命中，其相关文件的 hit_prob 增大
 //    int hit_prob;               // 指示本文件被命中的概率
 };
@@ -60,6 +62,8 @@ struct DiskInfo {
     int disk_size;              // MB
     int left_space;             // MB
     int file_num;
+
+    int hit_count;              // 命中次数
 
     MAP *file_list;             // Size: 48 bytes, <Key, FileInfo>
 

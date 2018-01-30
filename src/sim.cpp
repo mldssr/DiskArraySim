@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     } else {
         config.init("./conf.conf");
     }
-    char *log_dir = config.get_string("LOG", "Directory", "build/logs");
+    char *log_dir = config.get_string("LOG", "Directory", "./track/logs");
     log.init(log_dir);      // 初始化日志模块
 
     // 扫描数据
@@ -26,6 +26,7 @@ int main(int argc, char **argv) {
     if (scan_data(dir) != 0) {
         log.error("Fail to scan data");
     }
+    footprint();
 
     // 获取请求
     get_req();

@@ -47,7 +47,6 @@ void gen_req() {
 
     int min_day = str2days(min_date);
     int max_day = str2days(max_date);
-    log.debug("%d", max_day - min_day + 1);
 
     log.info("[REQ] Contents in req_list:");
     for (int i = 0; i < users; i++) {
@@ -197,7 +196,7 @@ void hand_over_a_file(int file_id) {
 
 // 将 req_list 中的 req 写入到 csv 文件中
 void record_all_req() {
-    char *req_track_file = config.get_string("TRACK", "ReqTrackFile", "req_track.csv");
+    char *req_track_file = config.get_string("TRACK", "ReqTrackFile", "./track/req_track.csv");
     File file(req_track_file, "w");
 
     // 写入第一行

@@ -31,8 +31,10 @@ int trans_time_per_file = 4;
 int file_id_num = 0;
 int data_disk_num = 0;
 int cache_disk_num = 0;
-DiskInfo **data_disk_array = new DiskInfo*[config.get_int("DATA", "DataDiskMaxNum", 100)]();
-DiskInfo **cache_disk_array = new DiskInfo*[config.get_int("DATA", "CacheDiskMaxNum", 4)]();
+DiskInfo **data_disk_array = NULL;
+DiskInfo **cache_disk_array = NULL;
+// FIXME: not work
+//cache_disk_array = new DiskInfo*[config.get_int("DATA", "CacheDiskMaxNum", 4)]();
 
 FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t time) {
     FileInfo *file = new FileInfo;
@@ -42,6 +44,7 @@ FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t
     file->ra = ra;
     file->dec = dec;
     file->time = time;
+    file->hit_count = 0;
 
     return file;
 }
@@ -55,6 +58,7 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
     disk->disk_size = disk_size;
     disk->left_space = disk_size;
     disk->file_num = 0;
+    disk->hit_count = 0;
 
     disk->file_list = new MAP;
 
@@ -84,6 +88,8 @@ void del_DiskInfo(DiskInfo *disk) {
  * 将 file 复制进 disk 的 rd_file_list 中
  */
 void read_file(FileInfo *file, DiskInfo *disk) {
+    file->hit_count++;
+    disk->hit_count++;
     disk->rd_file_list->push_back(std::make_pair(trans_time_per_file, *file));
     // 启动磁盘
 //    if (disk->disk_state == 0 - disk_start_time) {
@@ -97,6 +103,7 @@ void read_file(FileInfo *file, DiskInfo *disk) {
  */
 void write_file(FileInfo *file, DiskInfo *disk) {
     disk->wt_file_list->push_back(std::make_pair(trans_time_per_file, *file));
+    disk->wt_file_list->back().second.hit_count = 0;        // 从头计数
     disk->left_space -= file->file_size;
     disk->file_num += 1;
     // 启动磁盘
@@ -209,7 +216,7 @@ int search_all_disks(FileInfo *file) {
         }
     }
     if (min_tasks < 10000) {
-        log.debug("[SR_AL] Found in opened disk %d.", disk_id);
+//        log.debug("[SR_AL] Found in opened disk %d.", disk_id);
         return disk_id;
     }
 
@@ -225,7 +232,7 @@ int search_all_disks(FileInfo *file) {
         }
     }
     if (max_tasks > -1) {
-        log.debug("[SR_AL] Found in closed disk %d.", disk_id);
+//        log.debug("[SR_AL] Found in closed disk %d.", disk_id);
         return disk_id;
     }
 
@@ -288,13 +295,16 @@ void add_file_init(FileInfo *file, DiskInfo *disk) {
     disk->file_num += 1;
 }
 
-int data_disk_preserved_space = config.get_int("DATA", "DataDiskPreservedSpace", 200000);
 /*
  * 将 file 按顺序自动放入 DataDisks
  * 即将其放入最后一块空闲的 dataDisk，如果满了再启动下一块
  * 只用于系统初始化建立元数据索引时
  */
 int add_file(FileInfo *file) {
+    // 首次调用时初始化全局变量
+    if (data_disk_array == NULL) {
+        data_disk_array = new DiskInfo*[config.get_int("DATA", "DataDiskMaxNum", 100)]();
+    }
     // 初始化第1块disk
     if (data_disk_num == 0) {
         data_disk_array[data_disk_num] = new_DiskInfo(
@@ -304,6 +314,7 @@ int add_file(FileInfo *file) {
         data_disk_num++;
     }
     // 当前 disk 剩余空间不足预留空间
+    int data_disk_preserved_space = config.get_int("DATA", "DataDiskPreservedSpace", 200000);
     if (data_disk_array[data_disk_num - 1]->left_space <= data_disk_preserved_space) {
         if (data_disk_num >= config.get_int("DATA", "DataDiskMaxNum", 100)) {
             log.error("[MODEL] No extra DataDisks to hold more data!");
@@ -413,29 +424,29 @@ int handle_a_req(Req *req) {
 
     // 记录这次 req 的处理情况
     log.info("[MODEL] ======================================== Request Summary ========");
-    log.sublog("[MODEL] Request Info: ra %9.4f  dec %9.4f  date %s ~ %s\n",
+    log.sublog("        Request Info: ra %9.4f  dec %9.4f  date %s ~ %s\n",
             req->ra, req->dec, req->tg_date_start, req->tg_date_end);
-    log.sublog("[MODEL] disk_id    total_files    search_files    target_files\n");
-    for (int i = 0; i < data_disk_num; i++) {
-        log.sublog("[MODEL] %7d    %11d    %12d    %12d\n",
-                i, data_disk_array[i]->file_num, search_files[i], target_files[i]);
-    }
+//    log.sublog("        disk_id    total_files    search_files    target_files\n");
+//    for (int i = 0; i < data_disk_num; i++) {
+//        log.sublog("        %7d    %11d    %12d    %12d\n",
+//                i, data_disk_array[i]->file_num, search_files[i], target_files[i]);
+//    }
     int total_files = target_file_map.size();
-    log.sublog("[MODEL] Find %d target files in total.\n", total_files);
+    log.sublog("        Find %d target files in total.\n", total_files);
 
     if (total_files > MaxFilesPerReq)
-        log.info("[MODEL] Now return the top %d correlate files.", MaxFilesPerReq);
+        log.info("        Now return the top %d correlate files.", MaxFilesPerReq);
     else if (total_files > 0)
-        log.info("[MODEL] Now return all %d target files.", total_files);
+        log.info("        Now return all %d target files.", total_files);
     else
-        log.info("[MODEL] No file to return.");
+        log.info("        No file to return.");
 
     // 处理相应文件
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
         // 处理文件
-        log.sublog("[ %2d  ] file_quality: %f\n", index, rit->first);
+        log.pure("           [%2d] quality: %f", index, rit->first);
         show_file(&rit->second);
         int disk_id = search_all_disks(&rit->second);
         read_file(&rit->second, data_disk_array[disk_id]);
@@ -456,8 +467,8 @@ int handle_a_req(Req *req) {
 void show_file(FileInfo *file) {
     char buf[20];
     time_t2str(file->time, buf, sizeof(buf));
-    log.sublog("[File ] file_id %5d   file_size %d   ra %9.4f   dec %9.4f   time %s\n",
-            file->file_id, file->file_size, file->ra, file->dec, buf);
+    log.sublog("[File ] file_id %5d   file_size %d   ra %9.4f   dec %9.4f   time %s   hit_count %d\n",
+            file->file_id, file->file_size, file->ra, file->dec, buf, file->hit_count);
 }
 
 void show_disk(DiskInfo *disk) {
@@ -505,7 +516,7 @@ void show_all_disks() {
 File *shot = NULL;
 
 static void snapshot_init() {
-    char *snap_shot_file = config.get_string("TRACK", "SnapshotFile", "snapshot.csv");
+    char *snap_shot_file = config.get_string("TRACK", "SnapshotFile", "./track/snapshot.csv");
     shot = new File(snap_shot_file, "w");
     // 写入第一行
     shot->print("time");
@@ -553,6 +564,12 @@ void snapshot() {
 void snapshot_end() {
     delete shot;
     shot = NULL;
+
+    File disk_stat("./track/disk_hit_count_stat.txt", "w");
+    disk_stat.print("disk_id,   hit_count\n");
+    for (int i = 0; i < data_disk_num; i++) {
+        disk_stat.print("%7d,   %9d\n", i, data_disk_array[i]->hit_count);
+    }
 }
 
 void update_wt_list(DiskInfo *disk) {
@@ -611,6 +628,7 @@ bool time_to_shut_down() {
 }
 
 void all_disks_after_1s() {
+//    int max_idle_time = config.get_int("MAIN", "MaxIdleTime", 50);
     DiskInfo *disk;
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
@@ -646,7 +664,7 @@ void all_disks_after_1s() {
             }
             // 如果磁盘空转，空闲时间 +1
             else {
-                if (disk->disk_state < 60) {
+                if (disk->disk_state < config.get_int("MAIN", "MaxIdleTime", 50)) {
                     disk->disk_state++;
                 }
                 // 超过阈值，关闭磁盘

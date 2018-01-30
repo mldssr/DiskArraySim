@@ -23,7 +23,8 @@
 // 用来记录被请求的文件，以便从中分析文件相关度 <request_time, Key>
 std::map<int, Key> req_file_map;
 // 两个 file 能够产生关联的最大时间间隔
-int time_inerval = config.get_int("CORR", "TimeInterval", 60);
+// ERROR: 此时，config 还没 init()!!!
+//int time_inerval = config.get_int("CORR", "TimeInterval", 60);
 
 // 用来存储学习到的相关度
 C_MAP corrs;
@@ -49,6 +50,7 @@ void record_req_file(FileInfo *file, int exp_time) {
     add_key(new_key);
     req_file_map.insert(std::pair<int, Key>(exp_time, new_key));
 
+    int time_inerval = config.get_int("CORR", "TimeInterval", 60);
     std::map<int, Key>::iterator itlow = req_file_map.lower_bound(exp_time - time_inerval);
 
     // 依次检查 之前的 files 和此 file 的关系，记录到 corrs 中各自的相关文件列表中
@@ -173,13 +175,19 @@ void show_corrs() {
     log.pure("\n");
 }
 
-int max_num = config.get_int("DATA", "DataDiskMaxNum", 100);
-double *data_disk_hit_prob = new double[max_num]();
+int max_num = 0;
+double *data_disk_hit_prob = NULL;
 
 /*
  * 由近期内被访问的文件，推测磁盘的命中概率
  */
 void cal_data_disk_hit_prob() {
+    // 首次调用时初始化全局变量
+    if (data_disk_hit_prob == NULL) {
+        int max_num = config.get_int("DATA", "DataDiskMaxNum", 100);
+        data_disk_hit_prob = new double[max_num]();
+    }
+
     // 重置 data_disk_hit_prob
 //    memset(data_disk_hit_prob, 0, max_num * sizeof(double));
     for (int i = 0; i < max_num; i++) {
@@ -187,6 +195,7 @@ void cal_data_disk_hit_prob() {
     }
 
     // 定位到近期的被访问文件
+    int time_inerval = config.get_int("CORR", "TimeInterval", 60);
     std::map<int, Key>::iterator itlow = req_file_map.lower_bound(exp_time - time_inerval);
 
     // 从此 file 开始，依次检查各自的相关文件列表，将列表中的 hit_prob 加到对应的磁盘上
@@ -217,7 +226,7 @@ void cal_data_disk_hit_prob() {
 File *track_hit_prob = NULL;
 
 static void record_disk_hit_prob_init() {
-    char *disk_hit_prob_track_file = config.get_string("TRACK", "DiskHitProbTrackFile", "disk_hit_prob_track.csv");
+    char *disk_hit_prob_track_file = config.get_string("TRACK", "DiskHitProbTrackFile", "./track/disk_hit_prob_track.csv");
     track_hit_prob = new File(disk_hit_prob_track_file, "w");
     // 写入第一行
     track_hit_prob->print("time");
