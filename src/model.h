@@ -64,6 +64,8 @@ struct DiskInfo {
     int file_num;
 
     int hit_count;              // 命中次数
+    int start_times;            // 启动次数
+    double energy;              // 总能耗
 
     MAP *file_list;             // Size: 48 bytes, <Key, FileInfo>
 

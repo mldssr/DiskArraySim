@@ -59,6 +59,8 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
     disk->left_space = disk_size;
     disk->file_num = 0;
     disk->hit_count = 0;
+    disk->start_times = 0;
+    disk->energy = 0.0;
 
     disk->file_list = new MAP;
 
@@ -524,6 +526,7 @@ static void snapshot_init() {
         // disk_0, disk_1, disk_2, ...
         shot->print(",disk_%d", i);
     }
+    shot->print(",opened");
     shot->print(", ");
     for (int i = 0; i < data_disk_num; i++) {
         // tasks_0, tasks_1, tasks_2, ...
@@ -537,6 +540,7 @@ static void snapshot_init() {
     shot->print("\n");
 }
 
+int total_opened = 0;
 void snapshot() {
     if (shot == NULL) {
         snapshot_init();
@@ -544,9 +548,15 @@ void snapshot() {
     // 写入时间
     shot->print("%d", exp_time);
     // 写入当前各个磁盘状态
+    int opened = 0;
     for (int i = 0; i < data_disk_num; i++) {
         shot->print(",%d", data_disk_array[i]->disk_state);
+        if (data_disk_array[i]->disk_state >= 0) {
+            opened++;
+        }
     }
+    shot->print(",%d", opened);
+    total_opened += opened;
     // 写入当前各个磁盘任务数
     shot->print(", ");
     for (int i = 0; i < data_disk_num; i++) {
@@ -565,11 +575,26 @@ void snapshot_end() {
     delete shot;
     shot = NULL;
 
-    File disk_stat("./track/disk_hit_count_stat.txt", "w");
-    disk_stat.print("disk_id,   hit_count\n");
+    int total_start_times = 0;
+    double total_energy = 0.0;
+    File disk_stat("./track/disk_stat.txt", "w");
+    disk_stat.print("disk_id,   hit_count,   start_times,   energy\n");
     for (int i = 0; i < data_disk_num; i++) {
-        disk_stat.print("%7d,   %9d\n", i, data_disk_array[i]->hit_count);
+        DiskInfo *disk = data_disk_array[i];
+        disk_stat.print("%7d,   %9d,   %11d, %f\n",
+                i, disk->hit_count, disk->start_times, disk->energy);
+        total_start_times += disk->start_times;
+        total_energy += disk->energy;
     }
+
+    disk_stat.print("\n");
+    disk_stat.print("Total start times: %d.\n", total_start_times);
+    disk_stat.print("Average start times per disk: %d.\n", total_start_times / data_disk_num);
+    disk_stat.print("\n");
+    disk_stat.print("Total energy consumed: %f kJ.\n", total_energy / 1000);
+    disk_stat.print("Average energy consumed per second: %f J.\n", total_energy / exp_time);
+    disk_stat.print("\n");
+    disk_stat.print("Average opened disks per second: %d.\n", total_opened / exp_time);
 }
 
 void update_wt_list(DiskInfo *disk) {
@@ -626,6 +651,28 @@ bool time_to_shut_down() {
     }
     return ret;
 }
+/*
+ * WD10EZEX
+ * Power Management
+ * 12VDC ±10% (A, peak)             2.5
+ * Average power requirements (W)
+ * Read/Write                       6.8
+ * Idle                             6.1
+ * Standby/Sleep                    1.2
+ */
+static double get_energy(int state) {
+    double energy = 0.0;
+    if (state == 0 - disk_start_time) {     // 关闭
+        energy = 0.0;
+    } else if (state < 0) {                 // 启动中
+        energy = 30.0;
+    } else if (state == 0) {                // Read/Write
+        energy = 6.8;
+    } else {                                // Idle
+        energy = 6.1;
+    }
+    return energy;
+}
 
 void all_disks_after_1s() {
 //    int max_idle_time = config.get_int("MAIN", "MaxIdleTime", 50);
@@ -633,12 +680,14 @@ void all_disks_after_1s() {
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
         int state = disk->disk_state;
+        disk->energy += get_energy(state);
         // 磁盘处于关闭状态，无读写任务
         if (state == 0 - disk_start_time && not_busy(disk)) {
         }
         // 磁盘处于关闭状态，有读写任务，则开启磁盘
         else if (state == 0 - disk_start_time && !not_busy(disk)) {
             disk->disk_state++;
+            disk->start_times++;
         }
         // 磁盘尚未完全开启
         else if (state < 0) {

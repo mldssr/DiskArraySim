@@ -199,6 +199,12 @@ void record_all_req() {
     char *req_track_file = config.get_string("TRACK", "ReqTrackFile", "./track/req_track.csv");
     File file(req_track_file, "w");
 
+    File req_stat("./track/req_stat.txt", "w");
+    int total_qos = 0;
+    int total_reqs = config.get_int("REQ", "Users", 100);
+    int valid_reqs = 0;             // 记录匹配到文件的 req 数
+    int valid_files = 0;            // 记录所有 req 设计到的 file 数
+
     // 写入第一行
     file.print("gen_time,ra,dec,tg_date_start,tg_date_end");
     for (int i = 0; i < MaxFilesPerReq; i++) {
@@ -222,6 +228,10 @@ void record_all_req() {
                 max_hand_over_mom = mom;
             }
             file.print(",%d", mom);
+
+            if (mom != -2) {
+                valid_files++;
+            }
         }
 
         // 写入 qos，-1 表示尚未完成， 0 表示未匹配到文件
@@ -237,5 +247,18 @@ void record_all_req() {
             qos = 0;
         }
         file.print(",%d\n", qos);
+
+        if (qos != 0) {
+            valid_reqs++;
+        }
+        total_qos += qos;
     }
+
+    req_stat.print("total_qos %d\n", total_qos);
+    req_stat.print("total_reqs %d\n", total_reqs);
+    req_stat.print("valid_reqs %d\n", valid_reqs);
+    req_stat.print("valid_files %d\n", valid_files);
+    req_stat.print("\n");
+    req_stat.print("average qos of total_reqs: %f\n", 1.0 * total_qos / total_reqs);
+    req_stat.print("average qos of valid_reqs: %f\n", 1.0 * total_qos / valid_reqs);
 }
