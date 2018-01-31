@@ -119,21 +119,21 @@ void get_req() {
     }
 
     // 输出 req_list 的内容，调试时使用
-    log.debug("[req_list] ========================================================================================");
-    R_MAP::iterator iter;
-    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
-        log.debug("%5d   %9.4f   %9.4f   %s ~ %s", iter->second.gen_time, iter->second.ra,
-                iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
-        for (int i = 0; i < MaxFilesPerReq; i++) {
-            File_track *track = &iter->second.tracks[i];
-            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
-                continue;
-            }
-            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
-                    track->file_id, track->res_mom, track->hand_over_mom);
-        }
-        log.pure("\n");
-    }
+//    log.debug("[req_list] ========================================================================================");
+//    R_MAP::iterator iter;
+//    for (iter = req_list.begin(); iter != req_list.end(); iter++) {
+//        log.debug("%5d   %9.4f   %9.4f   %s ~ %s", iter->second.gen_time, iter->second.ra,
+//                iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
+//        for (int i = 0; i < MaxFilesPerReq; i++) {
+//            File_track *track = &iter->second.tracks[i];
+//            if (track->file_id == -1 && track->res_mom == -2 && track->hand_over_mom == -2) {
+//                continue;
+//            }
+//            log.sublog("file_id %d   res_mom %d   hand_over_mom %d.\n",
+//                    track->file_id, track->res_mom, track->hand_over_mom);
+//        }
+//        log.pure("\n");
+//    }
 }
 
 /*

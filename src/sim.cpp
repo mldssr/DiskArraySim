@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     snapshot_end();
 //    record_disk_hit_prob_end();
 
-    show_corrs();
+//    show_corrs();
 
     return 0;
 }

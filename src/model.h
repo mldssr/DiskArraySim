@@ -66,6 +66,10 @@ struct DiskInfo {
     int hit_count;              // 命中次数
     int start_times;            // 启动次数
     double energy;              // 总能耗
+    int prob_rank;              // 命中指数排名，概率由高到低：0, 1, 2, ...
+    int idle_th;                // 空闲时间高于此阈值时关闭磁盘
+    int delayed_time;           // 延迟启动的计时
+    int delayed_time_th;        // 超过此值就必须启动
 
     MAP *file_list;             // Size: 48 bytes, <Key, FileInfo>
 

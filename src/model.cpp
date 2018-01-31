@@ -22,7 +22,7 @@ int exp_time = 0;
 int length = 3;
 int width = 1.5;
 // HDD 启动时间，默认5秒
-int disk_start_time = 5;
+int disk_start_time = 7;
 // 传输一个文件所用的时间
 int trans_time_per_file = 4;
 
@@ -61,6 +61,10 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
     disk->hit_count = 0;
     disk->start_times = 0;
     disk->energy = 0.0;
+    disk->prob_rank = -1;
+    disk->idle_th = config.get_int("MAIN", "MaxIdleTime", 60);
+    disk->delayed_time = 0;
+    disk->delayed_time_th = 10;
 
     disk->file_list = new MAP;
 
@@ -437,19 +441,19 @@ int handle_a_req(Req *req) {
     log.sublog("        Find %d target files in total.\n", total_files);
 
     if (total_files > MaxFilesPerReq)
-        log.info("        Now return the top %d correlate files.", MaxFilesPerReq);
+        log.sublog("        Now return the top %d correlate files.\n", MaxFilesPerReq);
     else if (total_files > 0)
-        log.info("        Now return all %d target files.", total_files);
+        log.sublog("        Now return all %d target files.\n", total_files);
     else
-        log.info("        No file to return.");
+        log.sublog("        No file to return.\n");
 
     // 处理相应文件
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
         // 处理文件
-        log.pure("           [%2d] quality: %f", index, rit->first);
-        show_file(&rit->second);
+//        log.pure("           [%2d] quality: %f", index, rit->first);
+//        show_file(&rit->second);
         int disk_id = search_all_disks(&rit->second);
         read_file(&rit->second, data_disk_array[disk_id]);
         add_file_track(req, rit->second.file_id);
@@ -589,12 +593,12 @@ void snapshot_end() {
 
     disk_stat.print("\n");
     disk_stat.print("Total start times: %d.\n", total_start_times);
-    disk_stat.print("Average start times per disk: %d.\n", total_start_times / data_disk_num);
+    disk_stat.print("Average start times per disk: %f.\n", 1.0 * total_start_times / data_disk_num);
     disk_stat.print("\n");
     disk_stat.print("Total energy consumed: %f kJ.\n", total_energy / 1000);
     disk_stat.print("Average energy consumed per second: %f J.\n", total_energy / exp_time);
     disk_stat.print("\n");
-    disk_stat.print("Average opened disks per second: %d.\n", total_opened / exp_time);
+    disk_stat.print("Average opened disks per second: %f.\n", 1.0 * total_opened / exp_time);
 }
 
 void update_wt_list(DiskInfo *disk) {
@@ -674,8 +678,37 @@ static double get_energy(int state) {
     return energy;
 }
 
+static void update_th() {
+    // 更新所有磁盘的 prob_rank
+    for (int i = 0; i < data_disk_num; i++) {
+        // 统计有多少 disk 的命中指数比 disk i 高，其 prob_rank 就是几
+        int rank = 0;
+        for (int j = 0; j < data_disk_num; j++) {
+            if (data_disk_hit_prob[j] > data_disk_hit_prob[i]) {
+                rank++;
+            }
+        }
+        data_disk_array[i]->prob_rank = rank;
+    }
+
+    int max_th = config.get_int("MAIN", "MaxIdleTime", 60) * 2;
+    int min_th = config.get_int("MAIN", "MaxIdleTime", 60) * 3 / 4;
+    int step = (max_th - min_th) / (data_disk_num + 1);
+    for (int i = 0; i < data_disk_num; i++) {
+        data_disk_array[i]->idle_th = min_th + (data_disk_num - data_disk_array[i]->prob_rank) * step;
+        data_disk_array[i]->delayed_time_th = 10 + 2 * data_disk_array[i]->prob_rank;
+    }
+}
+
+static int rw_tasks (DiskInfo *disk) {
+    return disk->rd_file_list->size() + disk->wt_file_list->size();
+}
+
 void all_disks_after_1s() {
-//    int max_idle_time = config.get_int("MAIN", "MaxIdleTime", 50);
+    int mode = config.get_int("MAIN", "Mode", 0);
+    if (mode == 1 && exp_time >= 100 && exp_time % 10 == 0) {
+        update_th();
+    }
     DiskInfo *disk;
     for (int i = 0; i < data_disk_num; i++) {
         disk = data_disk_array[i];
@@ -686,6 +719,16 @@ void all_disks_after_1s() {
         }
         // 磁盘处于关闭状态，有读写任务，则开启磁盘
         else if (state == 0 - disk_start_time && !not_busy(disk)) {
+            // 读写任务少时延迟启动
+            if (mode == 1 && exp_time > 100 && rw_tasks(disk) < 2) {
+                disk->delayed_time++;
+                if (disk->delayed_time >= disk->delayed_time_th) {
+                    disk->disk_state++;
+                    disk->start_times++;
+                    disk->delayed_time = 0;
+                }
+                continue;
+            }
             disk->disk_state++;
             disk->start_times++;
         }
@@ -713,7 +756,7 @@ void all_disks_after_1s() {
             }
             // 如果磁盘空转，空闲时间 +1
             else {
-                if (disk->disk_state < config.get_int("MAIN", "MaxIdleTime", 50)) {
+                if (disk->disk_state < disk->idle_th) {
                     disk->disk_state++;
                 }
                 // 超过阈值，关闭磁盘
