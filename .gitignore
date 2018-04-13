@@ -3,7 +3,6 @@
 *.so
 *.out
 *.deb
-*.txt
 *.gz
 .cproject
 .project

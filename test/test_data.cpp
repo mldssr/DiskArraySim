@@ -27,6 +27,8 @@ void test_scan_data(const char *dir) {
     if (scan_data(dir) != 0) {
         log.error("Fail to scan data");
     }
+    log.info("Find %d files in total.", file_id_num);
+    log.info("Used %d data disks in total.", data_disk_num);
 }
 
 void test_footprint() {
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
 //    test_parse_file(data_name);
 
     test_scan_data("data");
-    test_footprint();
+//    test_footprint();
 
 //    show_all_disks();
 //    assert(!test_double());
