@@ -1,22 +1,14 @@
 BUILD := $(PWD)/build/
 CXX ?= g++
 
-INSTALL = cp
-DEB_PATH ?= deb_package
-VERSION = 1
-RELEASE = 0
-ARCH = x86_64
-# nbftp_1.0_x86_64.deb
-DEB_PACKAGE = nbftp_$(VERSION).$(RELEASE)_$(ARCH).deb
-
 CFLAGS := -O3 -Wall -std=c++11
-INCLUDE := $(shell pkg-config --cflags glib-2.0 openssl zlib)
-LIBFLAGS := $(shell pkg-config --libs glib-2.0 openssl zlib)
+#INCLUDE := $(shell pkg-config --cflags glib-2.0 openssl zlib)
+#LIBFLAGS := $(shell pkg-config --libs glib-2.0 openssl zlib)
 
 # searching directory for .cpp and .h files.
 VPATH := src:test
 INCLUDE += -Isrc
-LIBFLAGS += -pthread
+#LIBFLAGS += -pthread
 
 # make sure log comes before config, so that ~Log() comes after ~Config()
 UTILS := basic.cpp file.cpp log.cpp \
@@ -101,24 +93,6 @@ test_req: $(BUILD)test_req
 
 test_corr: $(BUILD)test_corr
 	$(BUILD)test_corr $(PWD)/conf.conf
-
-.PHONY: build_dir pre_pkg deb
-
-build_dir:
-	rm -rf $(DEB_PATH)
-	mkdir -p $(DEB_PATH)/DEBIAN/
-	mkdir -p $(DEB_PATH)/usr/bin/
-	mkdir -p $(DEB_PATH)/etc/nbftp/
-	mkdir -p $(DEB_PATH)/etc/init.d/
-
-pre_pkg: build_dir server
-	$(INSTALL) $(APPS) $(DEB_PATH)/usr/bin/
-	$(INSTALL) files/etc/* $(DEB_PATH)/etc/nbftp/
-	$(INSTALL) files/nbftp.init $(DEB_PATH)/etc/init.d/nbftp
-	$(INSTALL) files/debian/* $(DEB_PATH)/DEBIAN/
-
-deb: pre_pkg
-	cd $(DEB_PATH); dpkg -b . ../$(DEB_PACKAGE)
 
 clean:
 	@rm -rf $(OBJS) $(AOBJS) $(TOBJS) $(APPS) $(TAPPS)
