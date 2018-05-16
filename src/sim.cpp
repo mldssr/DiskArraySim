@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
     // 运行
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
     R_MAP::iterator iter = req_list.begin();
-    while((exp_time < max_req_time + 1) || (!time_to_shut_down())) {
-//        log.debug("exp_time: %d", exp_time);
+    while((exp_time < max_req_time) || (!time_to_shut_down())) {
+        log.pure("           Exp_time: %d\n", exp_time);
         // 处理这一秒的所有请求
         while (iter->second.gen_time == exp_time) {
             handle_a_req(&iter->second);
@@ -46,8 +46,10 @@ int main(int argc, char **argv) {
         }
 
         all_disks_after_1s();
-        cal_data_disk_hit_prob();
-//        record_disk_hit_prob();
+        if (config.get_int("MAIN", "Mode", 0) == 1) {
+            cal_data_disk_hit_prob();
+//            record_disk_hit_prob();
+        }
         snapshot();
         exp_time++;
     }

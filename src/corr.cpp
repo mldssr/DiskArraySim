@@ -64,6 +64,7 @@ void record_req_file(FileInfo *file, int exp_time) {
 }
 
 /*
+ * 将 key 指向的文件更新到 corrs 的索引中
  * 请求 key 后，调用此函数
  */
 void add_key(Key key) {

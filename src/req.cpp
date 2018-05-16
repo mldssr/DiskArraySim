@@ -199,7 +199,6 @@ void record_all_req() {
     char *req_track_file = config.get_string("TRACK", "ReqTrackFile", "./track/req_track.csv");
     File file(req_track_file, "w");
 
-    File req_stat("./track/req_stat.txt", "w");
     int total_qos = 0;
     int total_reqs = config.get_int("REQ", "Users", 100);
     int valid_reqs = 0;             // 记录匹配到文件的 req 数
@@ -254,6 +253,7 @@ void record_all_req() {
         total_qos += qos;
     }
 
+    File req_stat("./track/req_stat.txt", "w");
     req_stat.print("total_qos %d\n", total_qos);
     req_stat.print("total_reqs %d\n", total_reqs);
     req_stat.print("valid_reqs %d\n", valid_reqs);
