@@ -82,7 +82,7 @@ void Log::error(const char *msg, ...) {
     va_end(args);
 }
 
-/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，同 printf() */
+/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，不追加换行，同 printf() */
 void Log::pure(const char *msg, ...) {
     va_list args;
     va_start(args, msg);
@@ -90,7 +90,7 @@ void Log::pure(const char *msg, ...) {
     va_end(args);
 }
 
-/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，同 pure()，但会在开头空格，使内容对齐 */
+/* 独立于 LEVEL 体系，不加前置时间戳和 LEVEL，不追加换行，同 pure()，但会在开头空格，使内容对齐 */
 void Log::sublog(const char *msg, ...) {
     va_list args;
     va_start(args, msg);

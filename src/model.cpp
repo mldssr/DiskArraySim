@@ -5,6 +5,7 @@
  *      Author: lxx
  */
 #include <list>
+#include <set>
 #include "string.h"
 
 #include "time.h"
@@ -19,12 +20,12 @@
 int exp_time = 0;
 
 // 视场的长度与宽度，也是请求天区的长宽
-int length = 3;
-int width = 1.5;
+static int length = 3;
+static int width = 1.5;
 // HDD 启动时间，默认5秒
-int disk_start_time = 9;
+static int disk_start_time = 9;
 // 传输一个文件所用的时间
-int trans_time_per_file = 4;
+static int trans_time_per_file = 4;
 
 // config.get_int("DATA", "DataDiskNum", 20)
 // data_disk_num 记录目前所用的DataDisk数量
@@ -59,6 +60,7 @@ DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
     disk->left_space = disk_size;
     disk->file_num = 0;
     disk->hit_count = 0;
+    disk->hit_count_rank = 0;
     disk->start_times = 0;
     disk->energy = 0.0;
     disk->prob_rank = -1;
@@ -191,6 +193,7 @@ int search_file(FileInfo *file, DiskInfo *disk) {
  * @return   n --- 最佳的 disk_id
  */
 int search_all_disks(FileInfo *file) {
+    int mode = config.get_int("MAIN", "Mode", 0);
     // 统计可选方案
     bool has_target[data_disk_num];
     int disk_tasks[data_disk_num];
@@ -199,6 +202,9 @@ int search_all_disks(FileInfo *file) {
         // [IF] 实实在在找到
         if (search_file(file, data_disk_array[i]) == 1) {
             has_target[i] = true;
+            if (mode == 0) {
+                return i;
+            }
         } else {
             has_target[i] = false;
         }
@@ -226,7 +232,7 @@ int search_all_disks(FileInfo *file) {
         return disk_id;
     }
 
-    // 从关着的 disk 中找到最忙的
+    // 若没有开着的磁盘，则从关着的 disk 中找到最忙的
     int max_tasks = -1;
     disk_id = -1;
     for (int i = 0; i < data_disk_num; i++) {
@@ -374,12 +380,126 @@ double file_quality(FileInfo *file, double ra, double dec, time_t start, time_t 
     return quality;
 }
 
+// 更新所有磁盘的 hit_count_rank
+static void update_count_rank() {
+    for (int i = 0; i < data_disk_num; i++) {
+        // 统计有多少 disk 的 hit_count 比 disk i 高，其 hit_count_rank 就是几
+        int rank = 0;
+        for (int j = 0; j < data_disk_num; j++) {
+            if (data_disk_array[j]->hit_count > data_disk_array[i]->hit_count) {
+                ++rank;
+            }
+        }
+        data_disk_array[i]->hit_count_rank = rank;
+    }
+}
+
+// 找到最优disk
+static int find_best_disk(std::set<int> &all_disks, std::multiset<int> &all_multi_disks) {
+    int best_disk = -1;
+    int max_count = -1;
+    int pre_disk = -1;
+    std::set<int>::iterator it;
+    for (it = all_disks.begin(); it != all_disks.end(); it++) {
+        int id = *it;
+        int count = all_multi_disks.count(id);  // count 此时至少为 1
+        if (count > max_count) {    // 优先选择包含文件最多的disk
+            max_count = count;
+            best_disk = id;
+            pre_disk = id;
+        } else if (count == max_count) {    // 同为最多时，选择 hit_count 较大的
+            if (data_disk_array[id]->hit_count > data_disk_array[pre_disk]->hit_count) {
+                best_disk = id;
+                pre_disk = id;
+            }
+        }
+    }
+    log.sublog("        Find the best disk: %d\n", best_disk);
+    return best_disk;
+}
+
+static int target_disk[MaxFilesPerReq];     // 存储每个文件的最优disk
+static int addi_disk[MaxFilesPerReq];       // 存储每个文件的迁移disk
+static void print_schedule_result(int size) {
+    if (size == 0) {
+        return;
+    }
+    log.sublog("        target_disk:");
+    for (int i = 0; i < size; ++i) {
+        log.pure("  %2d", target_disk[i]);
+    }
+    log.pure("\n");
+    log.sublog("          addi_disk:");
+    for (int i = 0; i < size; ++i) {
+        log.pure("  %2d", addi_disk[i]);
+    }
+    log.pure("\n");
+}
+// 对于 file_map 中的所有文件，统一应酬应该开那个磁盘，迁移到哪里去
+static void update_smart_scheduler(std::multimap<double, FileInfo> &file_map) {
+    // 初始化
+    for (int i = 0; i < MaxFilesPerReq; ++i) {
+        target_disk[i] = -1;
+        addi_disk[i] = -1;
+    }
+    int size = file_map.size();
+    if (size > MaxFilesPerReq) {
+        size = MaxFilesPerReq;
+    }
+
+    // 扫描一遍，记录这些文件散布在哪些 disk 中
+//    bool record[size][MaxFilesPerReq];
+    std::set<int> rela_disks[size];
+    std::set<int> all_disks;
+    std::multiset<int> all_multi_disks;
+    std::multimap<double, FileInfo>::reverse_iterator rit;
+    int index = 0;
+    for (rit = file_map.rbegin(); index < size; rit++) {
+        for (int i = 0; i < data_disk_num; ++i) {
+            if (search_file(&rit->second, data_disk_array[i]) > 0) {
+                rela_disks[index].insert(i);
+                all_disks.insert(i);
+                all_multi_disks.insert(i);
+            }
+        }
+        ++index;
+    }
+    // 为每个文件分配最优disk
+    int solved = 0;         // 已经分配disk的file数
+    int best_disk = -1;     // 记录当前请求的最优disk
+    int cur_best_disk = -1; // 记录每次迭代的最优disk
+    while (solved < size) {
+        // 找到当前的最优disk
+        cur_best_disk = find_best_disk(all_disks, all_multi_disks);
+        if (best_disk == -1) {      // 第一个cur_best_disk即为当前请求的最优disk
+            best_disk = cur_best_disk;
+        }
+        // 决定此次最优disk囊括的所有file的最终disk
+        for (int i = 0; i < size; ++i) {
+            if (target_disk[i] < 0 && rela_disks[i].count(cur_best_disk) > 0) {
+                target_disk[i] = cur_best_disk;
+                ++solved;
+            }
+        }
+        all_disks.erase(cur_best_disk);
+        all_multi_disks.erase(cur_best_disk);
+    }
+    // 将非best_disk文件迁移到迁移到最优disk
+    for (int i = 0; i < size; ++i) {
+        if (target_disk[i] != best_disk) {
+            addi_disk[i] = best_disk;
+        }
+    }
+    print_schedule_result(size);
+}
+
 /*
  * 处理一次请求，即，找到所有相关文件，并缓存到 CacheDisk 中
  * @parm time 2017-12-12
  * @return 0 - success, 1 - failed
  */
 int handle_a_req(Req *req) {
+    int mode = config.get_int("MAIN", "Mode", 0);
     // 获取目标天的 time_t 范围
     char *start_date = stradd(req->tg_date_start, " 00:00:00");
     time_t start = str2time_t(start_date);
@@ -448,19 +568,32 @@ int handle_a_req(Req *req) {
         log.sublog("        No file to return.\n");
 
     // 处理相应文件
+    if (mode == 1) {
+        update_smart_scheduler(target_file_map);
+    }
     int index = 0;
     std::multimap<double, FileInfo>::reverse_iterator rit;
     for (rit = target_file_map.rbegin(); rit != target_file_map.rend(); rit++) {
-        // 处理文件
-        int disk_id = search_all_disks(&rit->second);
-        read_file(&rit->second, data_disk_array[disk_id]);
         add_file_track(req, rit->second.file_id);
-
 //        log.pure("           [%2d] quality: %f, diskID: %2d", index, rit->first, disk_id);
 //        show_file(&rit->second);
 
-        // 记录到 corr 模块
-        record_req_file(&rit->second, exp_time);
+        if (mode == 0) {
+            // 处理文件
+            int disk_id = search_all_disks(&rit->second);
+            read_file(&rit->second, data_disk_array[disk_id]);
+        } else {
+            int disk_id = target_disk[index];       // 最优磁盘
+            if (disk_id != -1) {
+                read_file(&rit->second, data_disk_array[disk_id]);
+            }
+            int addi_id = addi_disk[index];         // 是否把这个文件迁移到其它 disk
+            if (addi_id != -1) {
+                write_file(&rit->second, data_disk_array[addi_id]);
+            }
+            // 记录到 corr 模块
+            record_req_file(&rit->second, exp_time);
+        }
 
         // 只处理最相关的前 [MaxFilesPerReq] 个文件
         index++;
@@ -520,7 +653,7 @@ void show_all_disks() {
 }
 
 // 日志：记录每秒钟所有磁盘的状态
-File *shot = NULL;
+static File *shot = NULL;
 
 static void snapshot_init() {
     char *snap_shot_file = config.get_string("TRACK", "SnapshotFile", "./track/snapshot.csv");
@@ -549,7 +682,7 @@ static void snapshot_init() {
     shot->print("\n");
 }
 
-int total_opened = 0;
+static int total_opened = 0;
 void snapshot() {
     if (shot == NULL) {
         snapshot_init();
@@ -643,8 +776,8 @@ void update_rd_list(DiskInfo *disk) {
 }
 
 static void update_rw_list(DiskInfo *disk) {
-    update_wt_list(disk);
     update_rd_list(disk);
+    update_wt_list(disk);
 }
 
 /* 不管磁盘状态 */
@@ -741,9 +874,9 @@ static int urgent_disk() {
     return id;
 }
 
-double total_power = 0.0;
-bool power_overflow = false;
-int urgent_disk_id = -1;        // 满荷时，最想启动却启动不了的磁盘
+static double total_power = 0.0;
+static bool power_overflow = false;
+static int urgent_disk_id = -1;        // 满荷时，最想启动却启动不了的磁盘
 
 /* 用来更新以上三个变量 */
 static void update_urgent_disk() {

@@ -36,6 +36,7 @@ void gen_req() {
     char *min_date = config.get_string("REQ", "MinDate", "2016-03-14");
     char *max_date = config.get_string("REQ", "MaxDate", "2016-08-14");
     int users = config.get_int("REQ", "Users", 100);
+    int max_dups = config.get_int("REQ", "MaxDups", 1);
     int min_days = config.get_int("REQ", "MinDays", 1);
     int max_days = config.get_int("REQ", "MaxDays", 154);
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
@@ -62,16 +63,23 @@ void gen_req() {
         req.dec = dec;
         time_t2str((long) (day + 0) * 3600 * 24, req.tg_date_start, 11);
         time_t2str((long) (day + days_per_user - 1) * 3600 * 24, req.tg_date_end, 11);
-        req_list.insert(R_PAIR(req.gen_time, req));
-        log.sublog("User %3d   gen_time %5d   ra %9.4f   dec %9.4f   tg_date %s ~ %s\n",
-                i, gen_time, ra, dec, req.tg_date_start, req.tg_date_end);
+        int dups = get_random(1, max_dups);
+        for (int j = 0; j < dups; ++j) {
+            req_list.insert(R_PAIR(req.gen_time, req));
+            log.sublog("User %3d   gen_time %5d   ra %9.4f   dec %9.4f   tg_date %s ~ %s\n",
+                            i, req.gen_time, ra, dec, req.tg_date_start, req.tg_date_end);
+            do {
+                req.gen_time = get_random(1, max_req_time);
+            } while (req.gen_time == gen_time);
+            gen_time = req.gen_time;
+        }
     }
 
     File file(req_file, "w");
     file.print("gen_time,ra,dec,tg_date_start,tg_date_end\n");
     R_MAP::iterator iter;
     for (iter = req_list.begin(); iter != req_list.end(); iter++) {
-        file.print("%d,%f,%f,%s,%s\n", iter->second.gen_time, iter->second.ra,
+        file.print("%d,%.1f,%.1f,%s,%s\n", iter->second.gen_time, iter->second.ra,
                 iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
     }
 }
@@ -92,7 +100,7 @@ void get_req() {
 
     while (!file.is_eof()) {
         // 读取一行记录
-        // 74,276.000000,-70.000000,2016-03-14
+        // 21,239.8,-41.7,2016-03-14,2016-08-14
         memset(line, 0, sizeof(line));
         file.readline(line, 100);
         // 处理完最后一行后还会进入一次循环，读取到空字符串，排除之
@@ -200,7 +208,7 @@ void record_all_req() {
     File file(req_track_file, "w");
 
     int total_qos = 0;
-    int total_reqs = config.get_int("REQ", "Users", 100);
+    int total_reqs = 0;
     int valid_reqs = 0;             // 记录匹配到文件的 req 数
     int valid_files = 0;            // 记录所有 req 设计到的 file 数
 
@@ -215,6 +223,7 @@ void record_all_req() {
     // 依次写入每个请求
     R_MAP::iterator iter;
     for (iter = req_list.begin(); iter != req_list.end(); iter++) {
+        ++total_reqs;
         // 写入基础请求信息
         file.print("%d,%f,%f,%s,%s", iter->second.gen_time, iter->second.ra,
                 iter->second.dec, iter->second.tg_date_start, iter->second.tg_date_end);
