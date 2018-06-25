@@ -717,6 +717,7 @@ void snapshot() {
     shot->print("\n");
 }
 
+static double get_avg_peak_power();
 void snapshot_end() {
     delete shot;
     shot = NULL;
@@ -741,6 +742,8 @@ void snapshot_end() {
     disk_stat.print("Average energy consumed per second: %f J.\n", total_energy / exp_time);
     disk_stat.print("\n");
     disk_stat.print("Average opened disks per second: %f.\n", 1.0 * total_opened / exp_time);
+    disk_stat.print("\n");
+    disk_stat.print("Average top 100 peak power: %f W.\n", get_avg_peak_power());
 }
 
 void update_wt_list(DiskInfo *disk) {
@@ -904,6 +907,63 @@ static int most_idle_disk() {
     return id;
 }
 
+// 构造小顶堆
+//static void swap1(double *left, double *right) {
+//    double temp = *left;
+//    *left = *right;
+//    *right = temp;
+//}
+
+#define leftChild(i) (2*(i) + 1)
+
+static void percDown(double *arr, int i, int N) {
+    int child;
+    double tmp;
+    for (tmp = arr[i]; leftChild(i) < N; i = child) {
+        child = leftChild(i);
+        // 左右子节点中选取较小的一个
+        if (child != N - 1 && arr[child + 1] < arr[child]) {
+            child++;
+        }
+        if (arr[child] < tmp)
+            arr[i] = arr[child];
+        else
+            break;
+    }
+    arr[i] = tmp;
+}
+
+//void HeapSort(double *arr, int N) {
+//    int i;
+//    // 构造小顶堆
+//    for (i = N / 2; i >= 0; i--)
+//        percDown(arr, i, N);
+//    // 将堆顶和堆底元素交换，之后将底部上升，最后重新调用Min-Heapify保持最大堆性质
+//    for (i = N - 1; i > 0; i--) {
+//        swap1(&arr[0], &arr[i]);
+//        percDown(arr, 0, i);
+//    }
+//}
+
+double peak_power[100];
+
+static void update_peak_power() {
+    double power = get_total_power();
+    if (power > peak_power[0]) {
+        peak_power[0] = power;
+        percDown(peak_power, 0, 100);
+    }
+}
+
+static double get_avg_peak_power() {
+    double power = 0.0;
+    for (int i = 0; i < 100; ++i) {
+        power += peak_power[i];
+    }
+    power /= 100;
+    return power;
+}
+
 void all_disks_after_1s() {
     int mode = config.get_int("MAIN", "Mode", 0);
     if (mode == 1 && exp_time >= 100 && exp_time % 10 == 0) {
@@ -981,4 +1041,5 @@ void all_disks_after_1s() {
             }
         }
     }
+    update_peak_power();
 }
