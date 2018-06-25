@@ -1,0 +1,7 @@
+total_qos 47955
+total_reqs 1000
+valid_reqs 730
+valid_files 6569
+
+average qos of total_reqs: 47.955000
+average qos of valid_reqs: 65.691781
