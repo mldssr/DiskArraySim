@@ -14,6 +14,7 @@
 #include "utils/config.h"
 #include "model.h"
 #include "corr.h"
+#include "track.h"
 //#include "req.h"
 
 // 实验中的模拟计时，从 0 开始，每秒加 1
@@ -23,7 +24,7 @@ int exp_time = 0;
 static int length = 3;
 static int width = 1.5;
 // HDD 启动时间，默认5秒
-static int disk_start_time = 9;
+int disk_start_time = 9;
 // 传输一个文件所用的时间
 static int trans_time_per_file = 4;
 
@@ -31,10 +32,9 @@ static int trans_time_per_file = 4;
 // data_disk_num 记录目前所用的DataDisk数量
 int file_id_num = 0;
 int data_disk_num = 0;
-int cache_disk_num = 0;
 DiskInfo **data_disk_array = NULL;
-DiskInfo **cache_disk_array = NULL;
-// FIXME: not work
+//int cache_disk_num = 0;
+//DiskInfo **cache_disk_array = NULL;
 //cache_disk_array = new DiskInfo*[config.get_int("DATA", "CacheDiskMaxNum", 4)]();
 
 FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t time) {
@@ -419,7 +419,7 @@ static int find_best_disk(std::set<int> &all_disks, std::multiset<int> &all_mult
 }
 
 static int target_disk[MaxFilesPerReq];     // 存储每个文件的最优disk
-static int addi_disk[MaxFilesPerReq];       // 存储每个文件的迁移disk
+static int dump_disk[MaxFilesPerReq];       // 存储每个文件的迁移disk
 static void print_schedule_result(int size) {
     if (size == 0) {
         return;
@@ -429,9 +429,9 @@ static void print_schedule_result(int size) {
         log.pure("  %2d", target_disk[i]);
     }
     log.pure("\n");
-    log.sublog("          addi_disk:");
+    log.sublog("          dump_disk:");
     for (int i = 0; i < size; ++i) {
-        log.pure("  %2d", addi_disk[i]);
+        log.pure("  %2d", dump_disk[i]);
     }
     log.pure("\n");
 }
@@ -440,7 +440,7 @@ static void update_smart_scheduler(std::multimap<double, FileInfo> &file_map) {
     // 初始化
     for (int i = 0; i < MaxFilesPerReq; ++i) {
         target_disk[i] = -1;
-        addi_disk[i] = -1;
+        dump_disk[i] = -1;
     }
     int size = file_map.size();
     if (size > MaxFilesPerReq) {
@@ -487,7 +487,7 @@ static void update_smart_scheduler(std::multimap<double, FileInfo> &file_map) {
     // 将非best_disk文件迁移到迁移到最优disk
     for (int i = 0; i < size; ++i) {
         if (target_disk[i] != best_disk) {
-            addi_disk[i] = best_disk;
+            dump_disk[i] = best_disk;
         }
     }
     print_schedule_result(size);
@@ -587,7 +587,7 @@ int handle_a_req(Req *req) {
             if (disk_id != -1) {
                 read_file(&rit->second, data_disk_array[disk_id]);
             }
-            int addi_id = addi_disk[index];         // 是否把这个文件迁移到其它 disk
+            int addi_id = dump_disk[index];         // 是否把这个文件迁移到其它 disk
             if (addi_id != -1) {
                 write_file(&rit->second, data_disk_array[addi_id]);
             }
@@ -652,99 +652,7 @@ void show_all_disks() {
     }
 }
 
-// 日志：记录每秒钟所有磁盘的状态
-static File *shot = NULL;
 
-static void snapshot_init() {
-    char *snap_shot_file = config.get_string("TRACK", "SnapshotFile", "./track/snapshot.csv");
-    shot = new File(snap_shot_file, "w");
-    // 写入第一行
-    shot->print("time");
-    for (int i = 0; i < data_disk_num; i++) {
-        // disk_0, disk_1, disk_2, ...
-        shot->print(",disk_%d", i);
-    }
-    shot->print(",opened");
-    shot->print(", ");
-    for (int i = 0; i < data_disk_num; i++) {
-        // tasks_0, tasks_1, tasks_2, ...
-        shot->print(",tasks_%d", i);
-    }
-    if (config.get_int("MAIN", "Mode", 0) == 0) {       // 普通模式下不需要记录命中指数部分
-        shot->print("\n");
-        return;
-    }
-    shot->print(", ");
-    for (int i = 0; i < data_disk_num; i++) {
-        // prob_0, prob_1, prob_2, ...
-        shot->print(",prob_%d", i);
-    }
-    shot->print("\n");
-}
-
-static int total_opened = 0;
-void snapshot() {
-    if (shot == NULL) {
-        snapshot_init();
-    }
-    // 写入时间
-    shot->print("%5d", exp_time);
-    // 写入当前各个磁盘状态
-    int opened = 0;
-    for (int i = 0; i < data_disk_num; i++) {
-        shot->print(",%2d", data_disk_array[i]->disk_state);
-        if (data_disk_array[i]->disk_state >= 0) {
-            opened++;
-        }
-    }
-    shot->print(",%2d", opened);
-    total_opened += opened;
-    // 写入当前各个磁盘任务数
-    shot->print(", ");
-    for (int i = 0; i < data_disk_num; i++) {
-        int tasks = data_disk_array[i]->rd_file_list->size() + data_disk_array[i]->wt_file_list->size();
-        shot->print(",%d", tasks);
-    }
-    if (config.get_int("MAIN", "Mode", 0) == 0) {       // 普通模式下不需要记录命中指数部分
-        shot->print("\n");
-        return;
-    }
-    // 写入各个磁盘命中概率
-    shot->print(", ");
-    for (int i = 0; i < data_disk_num; i++) {
-        shot->print(",%8.2f", data_disk_hit_prob[i]);
-    }
-    shot->print("\n");
-}
-
-static double get_avg_peak_power();
-void snapshot_end() {
-    delete shot;
-    shot = NULL;
-
-    int total_start_times = 0;
-    double total_energy = 0.0;
-    File disk_stat("./track/disk_stat.txt", "w");
-    disk_stat.print("disk_id,   hit_count,   start_times,     energy\n");
-    for (int i = 0; i < data_disk_num; i++) {
-        DiskInfo *disk = data_disk_array[i];
-        disk_stat.print("%7d,   %9d,   %11d,   %8.1f\n",
-                i, disk->hit_count, disk->start_times, disk->energy);
-        total_start_times += disk->start_times;
-        total_energy += disk->energy;
-    }
-
-    disk_stat.print("\n");
-    disk_stat.print("Total start times: %d.\n", total_start_times);
-    disk_stat.print("Average start times per disk: %f.\n", 1.0 * total_start_times / data_disk_num);
-    disk_stat.print("\n");
-    disk_stat.print("Total energy consumed: %f kJ.\n", total_energy / 1000);
-    disk_stat.print("Average energy consumed per second: %f J.\n", total_energy / exp_time);
-    disk_stat.print("\n");
-    disk_stat.print("Average opened disks per second: %f.\n", 1.0 * total_opened / exp_time);
-    disk_stat.print("\n");
-    disk_stat.print("Average top 100 peak power: %f W.\n", get_avg_peak_power());
-}
 
 void update_wt_list(DiskInfo *disk) {
     RW_LIST::iterator iter = disk->wt_file_list->begin();
@@ -801,36 +709,6 @@ bool time_to_shut_down() {
     }
     return ret;
 }
-/*
- * WD10EZEX
- * Power Management
- * 12VDC ±10% (A, peak)             2.5
- * Average power requirements (W)
- * Read/Write                       6.8
- * Idle                             6.1
- * Standby/Sleep                    1.2
- */
-static double get_power(int state) {
-    double power = 0.0;
-    if (state == 0 - disk_start_time) {     // 关闭
-        power = 0.0;
-    } else if (state < 0) {                 // 启动中
-        power = 30.0;
-    } else if (state == 0) {                // Read/Write
-        power = 6.8;
-    } else {                                // Idle
-        power = 6.1;
-    }
-    return power;
-}
-
-static double get_total_power() {
-    double total_power = 0.0;
-    for (int i = 0; i < data_disk_num; ++i) {
-        total_power += get_power(data_disk_array[i]->disk_state);
-    }
-    return total_power;
-}
 
 static void update_th() {
     // 更新所有磁盘的 prob_rank
@@ -883,7 +761,7 @@ static int urgent_disk_id = -1;        // 满荷时，最想启动却启动不�
 
 /* 用来更新以上三个变量 */
 static void update_urgent_disk() {
-    total_power = get_total_power();
+    total_power = ideal_total_power();
     if (total_power > config.get_int("MAIN", "MaxPower", 500)) {
         urgent_disk_id = urgent_disk();
         power_overflow = true;
@@ -907,62 +785,7 @@ static int most_idle_disk() {
     return id;
 }
 
-// 构造小顶堆
-//static void swap1(double *left, double *right) {
-//    double temp = *left;
-//    *left = *right;
-//    *right = temp;
-//}
 
-#define leftChild(i) (2*(i) + 1)
-
-static void percDown(double *arr, int i, int N) {
-    int child;
-    double tmp;
-    for (tmp = arr[i]; leftChild(i) < N; i = child) {
-        child = leftChild(i);
-        // 左右子节点中选取较小的一个
-        if (child != N - 1 && arr[child + 1] < arr[child]) {
-            child++;
-        }
-        if (arr[child] < tmp)
-            arr[i] = arr[child];
-        else
-            break;
-    }
-    arr[i] = tmp;
-}
-
-//void HeapSort(double *arr, int N) {
-//    int i;
-//    // 构造小顶堆
-//    for (i = N / 2; i >= 0; i--)
-//        percDown(arr, i, N);
-//    // 将堆顶和堆底元素交换，之后将底部上升，最后重新调用Min-Heapify保持最大堆性质
-//    for (i = N - 1; i > 0; i--) {
-//        swap1(&arr[0], &arr[i]);
-//        percDown(arr, 0, i);
-//    }
-//}
-
-double peak_power[100];
-
-static void update_peak_power() {
-    double power = get_total_power();
-    if (power > peak_power[0]) {
-        peak_power[0] = power;
-        percDown(peak_power, 0, 100);
-    }
-}
-
-static double get_avg_peak_power() {
-    double power = 0.0;
-    for (int i = 0; i < 100; ++i) {
-        power += peak_power[i];
-    }
-    power /= 100;
-    return power;
-}
 
 void all_disks_after_1s() {
     int mode = config.get_int("MAIN", "Mode", 0);
@@ -975,7 +798,7 @@ void all_disks_after_1s() {
         update_urgent_disk();
         disk = data_disk_array[i];
         int state = disk->disk_state;
-        disk->energy += get_power(state);
+        disk->energy += ideal_power(state);
         // 磁盘处于关闭状态，无读写任务
         if (state == 0 - disk_start_time && not_busy(disk)) {
         }
@@ -1041,5 +864,4 @@ void all_disks_after_1s() {
             }
         }
     }
-    update_peak_power();
 }

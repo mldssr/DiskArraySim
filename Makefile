@@ -17,7 +17,8 @@ FILES := $(addprefix utils/,$(UTILS)) \
 		model.cpp \
 		data.cpp \
 		req.cpp \
-		corr.cpp
+		corr.cpp \
+		track.cpp
 AFILES := sim.cpp
 TFILES := test_basic.cpp \
 		test_file.cpp \

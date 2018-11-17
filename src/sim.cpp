@@ -10,6 +10,7 @@
 #include "data.h"
 #include "req.h"
 #include "corr.h"
+#include "track.h"
 
 int main(int argc, char **argv) {
     // 初始化配置文件

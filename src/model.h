@@ -118,9 +118,6 @@ void show_file(FileInfo *file);
 void show_disk(DiskInfo *disk);
 void show_all_disks();
 
-void snapshot();
-void snapshot_end();
-
 void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);
 
@@ -132,10 +129,9 @@ bool time_to_shut_down();
 void all_disks_after_1s();
 
 extern int exp_time;
+extern int disk_start_time;
 extern int file_id_num;
 extern int data_disk_num;
-extern int cache_disk_num;
 extern DiskInfo** data_disk_array;
-extern DiskInfo** cache_disk_array;
 
 #endif /* MODEL_H_ */
