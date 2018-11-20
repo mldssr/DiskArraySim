@@ -17,6 +17,9 @@
 /* 调用系统命令，返回值0为成功。 */
 int system_call(const char *__restrict cmd, ...);
 
+/* 调用系统命令，并获取输出结果（仅第一行，不包含\n），输出缓冲区由用户提供，失败时返回NULL。 */
+char *system_call(char *output, int size, const char *__restrict cmd, ...);
+
 /* 连接字符串，返回新的完整的字符串。 */
 char *stradd(const char *__restrict a, const char *__restrict b);
 char *stradd(const char *__restrict a, const char *__restrict b,

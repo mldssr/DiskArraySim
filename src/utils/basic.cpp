@@ -14,7 +14,10 @@
 
 #include "basic.h"
 
-/* 调用系统命令，返回值0为成功。 */
+/*
+ * 调用系统命令，返回值0为成功。
+ * 会等到命令执行完毕后才返回。
+ */
 int system_call(const char *__restrict cmd, ...) {
     char buffer[CMD_LEN];
     va_list args;
@@ -22,6 +25,28 @@ int system_call(const char *__restrict cmd, ...) {
     vsprintf(buffer, cmd, args);
     va_end(args);
     return system(buffer);
+}
+
+/* 调用系统命令，并获取输出结果（仅第一行，不包含\n），输出缓冲区由用户提供，失败时返回NULL。 */
+char *system_call(char *output, int size, const char *__restrict cmd, ...) {
+    char buffer[CMD_LEN];
+    va_list args;
+    va_start(args, cmd);
+    vsprintf(buffer, cmd, args);
+    va_end(args);
+
+    FILE *fp = popen(buffer, "r");
+    if (!fp) {
+        return NULL;
+    }
+    if (fgets(output, size, fp)) {
+        if (output[strlen(output) - 1] == '\n') {
+            output[strlen(output) - 1] = '\0';  // 去除最后的换行符
+        }
+    }
+    pclose(fp);
+
+    return output;
 }
 
 /*
@@ -186,7 +211,7 @@ void time_t2str(time_t time, char *buf, size_t buf_size) {
 }
 
 /*
- * 将地方时间str，例如 "2017-12-12 19:03:45, 转化为time_t"
+ * 将地方时间str，例如 "2017-12-12 19:03:45", 转化为time_t
  */
 time_t str2time_t(const char *time_str) {
     struct tm ptm;
