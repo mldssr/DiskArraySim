@@ -28,15 +28,18 @@ int system_call(const char *__restrict cmd, ...) {
 }
 
 /* 调用系统命令，并获取输出结果（仅第一行，不包含\n），输出缓冲区由用户提供，失败时返回NULL。 */
-char *system_call(char *output, int size, const char *__restrict cmd, ...) {
+// 只能获取 stdout，无法获取 stderr
+char *system_callback(char *output, int size, const char *__restrict cmd, ...) {
     char buffer[CMD_LEN];
     va_list args;
     va_start(args, cmd);
     vsprintf(buffer, cmd, args);
     va_end(args);
 
+    output[0] = '\0';
     FILE *fp = popen(buffer, "r");
     if (!fp) {
+        printf("[BASIC] Fail to exe CMD: %s\n", buffer);
         return NULL;
     }
     if (fgets(output, size, fp)) {

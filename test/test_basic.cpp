@@ -23,6 +23,32 @@ static void test_MAX() {
     printf("Test MAX passed!\n");
 }
 
+//static void test_system_call() {
+//    printf("Copy begin.\n");
+//    int ret = system_call("cp /home/lxx/Media/ready.player.one.2018.720p.web.h264-webtiful.mkv /home/lxx/Media/real.mkv");
+//    if (ret == 0) {
+//        printf("Copy successfully.\n");
+//    } else {
+//        printf("Copy failed.\n");
+//    }
+//}
+
+static void test_system_callback() {
+    char output[1024];
+    if (!system_callback(output, sizeof(output), "ls -l /dev %s", " | grep sd")) {
+        printf("Error occurs when system_call()!\n");
+    }
+    printf("%s\n", output);
+    if (!system_callback(output, sizeof(output), "ipmitool sdr get PSU1_POUT | awk 'NR==4 {print $3}'")) {
+        printf("Error occurs when system_call()!\n");
+    }
+    printf("%s\n", output);
+    if (!system_callback(output, sizeof(output), "NoCmd")) {
+        printf("Error occurs when system_call()!\n");
+    }
+    printf("%s\n", output);
+}
+
 static void test_stradd() {
     char *get;
     get = stradd("Hello", " World!");
@@ -159,16 +185,17 @@ static void test_random() {
 }
 
 int main(int argc, char **argv) {
-    test_MAX();
-    test_stradd();
-    test_strbase();
-    test_strext();
-    test_strcount();
-    test_strtrim();
-    test_strfit();
-    test_strreplace();
-    test_str2hex();
-    test_time();
-    test_random();
+    test_system_callback();
+//    test_MAX();
+//    test_stradd();
+//    test_strbase();
+//    test_strext();
+//    test_strcount();
+//    test_strtrim();
+//    test_strfit();
+//    test_strreplace();
+//    test_str2hex();
+//    test_time();
+//    test_random();
     return 0;
 }

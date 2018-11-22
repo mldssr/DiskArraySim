@@ -60,6 +60,20 @@ int test_size() {
     return 0;
 }
 
+void test_get_file_name() {
+    FileInfo *file0 = new_FileInfo(0, 200, 332.4060, -56.6292, 121);
+    char *name = get_file_name(file0);
+    printf("%s\n", name);
+    delete name;
+    delete file0;
+
+    file0 = new_FileInfo(0, 200, 32.4060, -6.6292, 121);
+    name = get_file_name(file0);
+    printf("%s\n", name);
+    delete name;
+    delete file0;
+}
+
 /*
  * 测试 read_file(), write_file(), delete_file(), search_file(), copy_file(), move_file(),
  */
@@ -183,12 +197,13 @@ int main(int argc, char **argv) {
     log.init(log_dir);      // 初始化日志模块
 
 //    test_size();
+    test_get_file_name();
 //    test_file_operation();
 //    test_var();
 //    test_handle_a_req();
 //    assert(!test_double());
 //    log.info("All tests passed!\n");
-    test_key();
+//    test_key();
 
 //    test_update_rw_list();
 

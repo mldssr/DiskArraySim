@@ -23,7 +23,7 @@
 double ideal_power(int state) {
     double power = 0.0;
     if (state == 0 - disk_start_time) {     // 关闭
-        power = 0.0;
+        power = 1.2;
     } else if (state < 0) {                 // 启动中
         power = 30.0;
     } else if (state == 0) {                // Read/Write
@@ -44,8 +44,8 @@ double ideal_total_power() {
 
 double real_total_power() {
     double power = 0;
-    char buffer[20];
-    if (!system_call(buffer, sizeof(buffer), "ipmitool sdr get PSU1_POUT | awk 'NR==4 {print $3}'")) {
+    char buffer[100];
+    if (!system_callback(buffer, sizeof(buffer), "ipmitool sdr get PSU1_POUT | awk 'NR==4 {print $3}'")) {
         log.error("[TRACK] Fail to call ipmitool.");
     }
     sscanf(buffer, "%lf", &power);

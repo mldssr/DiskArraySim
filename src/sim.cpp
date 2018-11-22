@@ -10,6 +10,7 @@
 #include "data.h"
 #include "req.h"
 #include "corr.h"
+#include "disk_ctl.h"
 #include "track.h"
 
 int main(int argc, char **argv) {
@@ -29,6 +30,9 @@ int main(int argc, char **argv) {
     }
     footprint();
 
+    Disk_Ctl *disk_controller = new Disk_Ctl;
+    data_init();
+    log.debug("[MAIN ] Data distribution initialized.");
     // 获取请求
     get_req();
 
@@ -52,8 +56,10 @@ int main(int argc, char **argv) {
 //            record_disk_hit_prob();
         }
         snapshot();
-        exp_time++;
+        update_exp_time();
     }
+
+    delete disk_controller;
 
     record_all_req();
 

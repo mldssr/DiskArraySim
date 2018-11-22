@@ -16,7 +16,7 @@
 
 #define MAP         std::map<Key, FileInfo>
 #define PAIR        std::pair<Key, FileInfo>
-#define RW_LIST     std::list<std::pair<int, FileInfo>>
+#define RW_LIST     std::list<std::pair<int, FileInfo> >
 
 struct Key {
     double ra;
@@ -84,6 +84,7 @@ struct DiskInfo {
 };
 
 FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t time);
+char *get_file_name(FileInfo *file);
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size);
 void del_DiskInfo(DiskInfo *disk);
 
@@ -102,6 +103,8 @@ int move_file(FileInfo *file, DiskInfo *disk_fr, DiskInfo *disk_to);
 void add_file_init(FileInfo *file, DiskInfo *disk);
 
 int add_file(FileInfo *file);
+
+void data_init();
 
 bool is_target_file(FileInfo *file, double ra, double dec, time_t start, time_t end);
 
@@ -122,13 +125,15 @@ void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);
 
 bool time_to_shut_down();
-
+// 指定磁盘读写队列的任务总数
+int rw_tasks (DiskInfo *disk);
 /*
  * 经过1s后，更新所有disk的状态
  */
 void all_disks_after_1s();
 
 extern int exp_time;
+void update_exp_time();
 extern int disk_start_time;
 extern int file_id_num;
 extern int data_disk_num;

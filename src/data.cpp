@@ -220,3 +220,22 @@ void footprint() {
     file.print("\n");
     file.print("  whole, %9.4f, %9.4f, %9.4f, %9.4f\n", ra_min, ra_max, dec_min, dec_max);
 }
+
+/*
+ * 生成指定文件名的文件，到指定目录，内容随机
+ * @return 0-success, 1-failed
+ */
+void gen_file(const char *dir, const char *file_name) {
+    File file(dir, file_name, "wb");
+    int file_size = config.get_int("DATA", "FileSize", 200);
+    char buffer[1024];
+    for (int i = 0; i < file_size; ++i) {
+        for (int j = 0; j < 1024; ++j) {
+            for (int k = 0; k < 1024; ++k) {
+                buffer[k] = get_random(0, 255);
+            }
+            file.write(buffer, 1024, 1);
+        }
+    }
+}
+

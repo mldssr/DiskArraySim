@@ -28,4 +28,10 @@ int scan_data(const char *dir);
  */
 void footprint();
 
+/*
+ * 生成指定文件名的文件，到指定目录
+ * @return 0-success, 1-failed
+ */
+void gen_file(const char *dir, const char *file_name);
+
 #endif /* SRC_DATA_H_ */

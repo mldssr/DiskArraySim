@@ -7,24 +7,42 @@
 #include <list>
 #include <set>
 #include "string.h"
+#include "unistd.h"
 
 #include "time.h"
+#include "utils/basic.h"
 #include "utils/log.h"
 #include "utils/file.h"
 #include "utils/config.h"
 #include "model.h"
 #include "corr.h"
 #include "track.h"
+#include "disk_ctl.h"
 //#include "req.h"
 
 // 实验中的模拟计时，从 0 开始，每秒加 1
 int exp_time = 0;
+void update_exp_time() {
+    static time_t basic = 0;
+    static time_t pre, now;
+    if (basic == 0) {
+        time(&now);
+        basic = now;
+        pre = now;
+    }
+    while(now == pre) {
+        usleep(100000);
+        time(&now);
+    }
+    pre = now;
+    exp_time = now - basic;
+}
 
 // 视场的长度与宽度，也是请求天区的长宽
 static int length = 3;
 static int width = 1.5;
 // HDD 启动时间，默认5秒
-int disk_start_time = 9;
+int disk_start_time = 2;
 // 传输一个文件所用的时间
 static int trans_time_per_file = 4;
 
@@ -50,6 +68,21 @@ FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t
     return file;
 }
 
+/*
+ * 将 FileInfo 转换为字符串
+ * 格式：RA_Dec_Date_Time.fits
+ * 例如：332.4060_-56.6292_2016-03-14_17:41:09.fits
+ *      032.4060_-06.6292_2016-03-14_17:41:09.fits
+ * 注：调用者应在用完后及时 delete，避免内存泄露
+ */
+char *get_file_name(FileInfo *file) {
+    char *name = new char[100];
+    char date_time[20];
+    time_t2str(file->time, date_time, 20);
+    date_time[10] = '_';
+    sprintf(name, "%08.4f_%08.4f_%s.fits", file->ra, file->dec, date_time);
+    return name;
+}
 
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
     DiskInfo *disk = new DiskInfo;
@@ -209,10 +242,7 @@ int search_all_disks(FileInfo *file) {
             has_target[i] = false;
         }
 
-        int rd_size = data_disk_array[i]->rd_file_list->size();
-        int wt_size = data_disk_array[i]->wt_file_list->size();
-        disk_tasks[i] = rd_size + wt_size;
-
+        disk_tasks[i] = rw_tasks(data_disk_array[i]);
         disk_states[i] = data_disk_array[i]->disk_state;
     }
 
@@ -339,9 +369,45 @@ int add_file(FileInfo *file) {
         data_disk_num++;
     }
 
-    add_file_init(file, data_disk_array[data_disk_num - 1]);
+//    add_file_init(file, data_disk_array[data_disk_num - 1]);
+    write_file(file, data_disk_array[data_disk_num - 1]);
 
     return 0;
+}
+
+// 用于系统计时器开始前将数据写入到各个磁盘上
+void data_init() {
+    // 初始化数据
+
+    system_call("rm -f /dev/shm/*.fits");
+    // 使能各个磁盘
+    for (int i = 0; i < data_disk_num; ++i) {
+        data_disk_array[i]->disk_state = 0;
+    }
+
+    // 等待 Disk_Ctl 处理完 I/O
+    while(true) {
+        bool finished = true;
+        for (int i = 0; i < data_disk_num; ++i) {
+            if (data_disk_array[i]->wt_file_list->size() > 0) {
+                finished = false;
+                break;
+            }
+        }
+        if (finished) {
+            log.info("[MODEL] I/O finished.");
+            break;
+        } else {
+            log.debug("[MODEL] I/O not finished, sleep 1 sec.");
+            sleep(1); // 休眠 1 秒
+        }
+    }
+    // spin_down 各个磁盘
+    for (int i = 0; i < data_disk_num; ++i) {
+        data_disk_array[i]->disk_state = 0 - disk_start_time;
+        Disk_Ctl::spin_down_disk(i);
+        log.debug("[MODEL] Disk %d prepared!", i);
+    }
 }
 
 /*
@@ -652,8 +718,6 @@ void show_all_disks() {
     }
 }
 
-
-
 void update_wt_list(DiskInfo *disk) {
     RW_LIST::iterator iter = disk->wt_file_list->begin();
     if (iter != disk->wt_file_list->end()) {
@@ -735,7 +799,7 @@ static void update_th() {
     }
 }
 
-static int rw_tasks (DiskInfo *disk) {
+int rw_tasks (DiskInfo *disk) {
     return disk->rd_file_list->size() + disk->wt_file_list->size();
 }
 
@@ -859,6 +923,7 @@ void all_disks_after_1s() {
                 // 超过阈值，关闭磁盘
                 else {
                     disk->disk_state = 0 - disk_start_time;
+                    Disk_Ctl::spin_down_disk(i);
 //                    log.debug("[MODEL] CLose disk %d", disk->disk_id);
                 }
             }

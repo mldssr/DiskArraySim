@@ -8,7 +8,7 @@ CFLAGS := -O3 -Wall -std=c++11
 # searching directory for .cpp and .h files.
 VPATH := src:test
 INCLUDE += -Isrc
-#LIBFLAGS += -pthread
+LIBFLAGS += -pthread
 
 # make sure log comes before config, so that ~Log() comes after ~Config()
 UTILS := basic.cpp file.cpp log.cpp \
@@ -16,6 +16,7 @@ UTILS := basic.cpp file.cpp log.cpp \
 FILES := $(addprefix utils/,$(UTILS)) \
 		model.cpp \
 		data.cpp \
+		disk_ctl.cpp \
 		req.cpp \
 		corr.cpp \
 		track.cpp

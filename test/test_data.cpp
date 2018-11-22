@@ -35,6 +35,10 @@ void test_footprint() {
     footprint();
 }
 
+void test_gen_file() {
+    gen_file("/dev/shm/", "A_New_File");
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         fprintf(stderr, "Need a parameter of profile!");
@@ -48,7 +52,8 @@ int main(int argc, char **argv) {
 //    test_parse_file(data_name);
 
     test_scan_data("data");
-//    test_footprint();
+    test_footprint();
+    test_gen_file();
 
 //    show_all_disks();
 //    assert(!test_double());
