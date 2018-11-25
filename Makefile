@@ -1,7 +1,7 @@
 BUILD := $(PWD)/build/
 CXX ?= g++
 
-CFLAGS := -O3 -Wall -std=c++11
+CFLAGS := -O3 -Wall -std=c++11 #-std=c++0x
 #INCLUDE := $(shell pkg-config --cflags glib-2.0 openssl zlib)
 #LIBFLAGS := $(shell pkg-config --libs glib-2.0 openssl zlib)
 

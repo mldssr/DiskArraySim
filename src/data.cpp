@@ -6,6 +6,7 @@
  */
 #include "time.h"
 #include "string.h"
+#include "unistd.h"
 
 #include "utils/basic.h"
 #include "utils/file.h"
@@ -166,7 +167,7 @@ int scan_data(const char *dir) {
  */
 void footprint() {
     File file("./track/footprint.txt", "w");
-    file.print("  disk,    ra_min,    ra_max,   dec_min,   dec_max\n");
+    file.print("   disk,    ra_min,    ra_max,   dec_min,   dec_max,  file_num\n");
 
     double ra_min = 360.0;
     double ra_max = 0.0;
@@ -200,7 +201,8 @@ void footprint() {
                 sub_dec_max = dec;
             }
         }
-        file.print("disk_%02d, %9.4f, %9.4f, %9.4f, %9.4f\n", i, sub_ra_min, sub_ra_max, sub_dec_min, sub_dec_max);
+        int file_num = data_disk_array[i]->file_list->size() + data_disk_array[i]->wt_file_list->size();
+        file.print("disk_%02d, %9.4f, %9.4f, %9.4f, %9.4f, %9d\n", i, sub_ra_min, sub_ra_max, sub_dec_min, sub_dec_max, file_num);
 
         // 更新全局范围
         if (sub_ra_min < ra_min) {
@@ -226,14 +228,43 @@ void footprint() {
  * @return 0-success, 1-failed
  */
 void gen_file(const char *dir, const char *file_name) {
+    static bool first_call = true;
+    int tmp_size = 50; // MB
+    const char *tmp_file_path = "/dev/shm/template_50.fits";
+    const char *tmp_file_tmp_path = "/dev/shm/template_50_tmp.fits";
+    // 创建模板文件
+    if (first_call) {
+        first_call = false;
+        File *fp = new File(tmp_file_tmp_path, "wb");
+        char buffer[1024];
+        for (int i = 0; i < tmp_size; ++i) {
+            for (int j = 0; j < 1024; ++j) {
+                for (int k = 0; k < 1024; ++k) {
+                    buffer[k] = get_random(0, 255);
+                }
+                fp->write(buffer, 1024, 1);
+            }
+        }
+        delete fp;
+        rename_file(tmp_file_tmp_path, tmp_file_path);
+    }
+    // 等待第一个线程将模板文件创建完成
+    while (!is_exist(tmp_file_path)) {
+        sleep(1);
+    }
+    // 创建文件
+    File tmp_file(tmp_file_path, "rb");
     File file(dir, file_name, "wb");
     int file_size = config.get_int("DATA", "FileSize", 200);
-    char buffer[1024];
+    char buffer[1025];  // 1024 also OK
     for (int i = 0; i < file_size; ++i) {
         for (int j = 0; j < 1024; ++j) {
-            for (int k = 0; k < 1024; ++k) {
-                buffer[k] = get_random(0, 255);
-            }
+            int mb = get_random(0, 48);
+            int kb = get_random(0, 1023);
+            int b  = get_random(0, 1023);
+            long pos = mb * kb * 1024 + b;
+            tmp_file.seek(pos);
+            tmp_file.read(buffer, 1024, 1);
             file.write(buffer, 1024, 1);
         }
     }

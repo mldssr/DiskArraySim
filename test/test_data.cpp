@@ -36,7 +36,7 @@ void test_footprint() {
 }
 
 void test_gen_file() {
-    gen_file("/dev/shm/", "A_New_File");
+    gen_file("/dev/shm/", "A_New_File.fits");
 }
 
 int main(int argc, char **argv) {
