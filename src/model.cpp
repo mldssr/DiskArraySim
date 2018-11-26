@@ -36,6 +36,13 @@ void update_exp_time() {
     }
     pre = now;
     exp_time = now - basic;
+
+    if (exp_time % 10 == 0) {
+        for (int i = 0; i < data_disk_num; ++i) {
+            DiskInfo *disk = data_disk_array[i];
+            log.debug("[MAIN ] Disk %d: %5d  %5d  %5d", i, disk->file_list->size(), disk->rd_file_list->size(), disk->wt_file_list->size());
+        }
+    }
 }
 
 // 视场的长度与宽度，也是请求天区的长宽
@@ -76,8 +83,8 @@ FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t
  * 注：调用者应在用完后及时 delete，避免内存泄露
  */
 char *get_file_name(FileInfo *file) {
-    char *name = new char[100];
-    char date_time[20];
+    char *name = new char[100]();
+    char date_time[30];
     time_t2str(file->time, date_time, 20);
     date_time[10] = '_';
     sprintf(name, "%08.4f_%08.4f_%s.fits", file->ra, file->dec, date_time);
