@@ -77,6 +77,14 @@ void handle_rd(int id) {
         // 传输数据
         FileInfo *file = &iter->second;
         char *file_name = get_file_name(file);
+        if (!file_name) {
+            log.error("[DISK ] Failed to get file name.");
+            // 将 file 从 rd_list 直接删除
+            hand_over_a_file(iter->second.file_id);
+            disk->rd_file_list->erase(iter);
+            iter = disk->rd_file_list->begin();
+            continue;
+        }
         log.debug("[DISK ] Thread %d[%d]: Going to read file %s.", id, count, file_name);
         if (!system_call("cp %s%s %s", dir[id], file_name, tmp_dir)) { // 读取成功
             log.debug("[DISK ] Thread %d[%d]: Read file success!", id, count);
@@ -141,19 +149,21 @@ Disk_Ctl::Disk_Ctl() {
     dev = new char*[_disk_num];
     dir = new char*[_disk_num];
     for (int i = 0; i < _disk_num; ++i) {
-        dev[i] = new char[20];
+        dev[i] = new char[50]();
         sprintf(dev[i], "/dev/sd%c", 'b'+i);    // 设备名，例如 /dev/sdb
-        dir[i] = new char[20];
+        dir[i] = new char[50]();
         sprintf(dir[i], "/media/hdd0%c/fits/", '0'+i);  // 目录名，例如 /media/hdd00/fits/
     }
 
-    system_call("hdparm -B 50 /dev/sd[b-i]");   // 允许磁盘 spin-down
-    int mode = config.get_int("MAIN", "Mode", 0);
-    int idle_th = config.get_int("MAIN", "MaxIdleTime", 60);
-    if (mode == 0) {    // 普通模式
-        system_call("hdparm -S %d /dev/sd[b-i]", idle_th/5);
-    } else {            // DAES
-        system_call("hdparm -S %d /dev/sd[b-i]", idle_th*2/5);
+    if (config.get_int("MAIN", "InitDisk", 1)) {
+        system_call("hdparm -B 50 /dev/sd[b-i]");   // 允许磁盘 spin-down
+        int mode = config.get_int("MAIN", "Mode", 0);
+        int idle_th = config.get_int("MAIN", "MaxIdleTime", 60);
+        if (mode == 0) {    // 普通模式
+            system_call("hdparm -S %d /dev/sd[b-i]", idle_th/5);
+        } else {            // DAES
+            system_call("hdparm -S %d /dev/sd[b-i]", idle_th*2/5);
+        }
     }
 
     argss = new Args*[_disk_num];

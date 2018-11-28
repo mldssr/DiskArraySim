@@ -43,12 +43,14 @@ double ideal_total_power() {
 }
 
 double real_total_power() {
-    double power = 0;
+    double power = 0.0;
     char buffer[100];
-    if (!system_callback(buffer, sizeof(buffer), "ipmitool sdr get PSU1_POUT | awk 'NR==4 {print $3}'")) {
+    if (!system_callback(buffer, sizeof(buffer), "ipmitool sdr get PSU1_POUT | awk 'NR==4 {print $4}'")) {
         log.error("[TRACK] Fail to call ipmitool.");
     }
-    sscanf(buffer, "%lf", &power);
+    if (sscanf(buffer, "%lf", &power) != 1) {
+        log.error("[TRACK] Failed to convert power.");
+    }
     return power;
 }
 
@@ -86,6 +88,7 @@ static void percDown(double *arr, int i, int N) {
 
 double ideal_peak_power[100];   // 存放 Top 100 理想功率
 double real_peak_power[100];    // 存放 Top 100 真实功率
+double total_real_energy = 0.0;
 static int total_opened = 0;    // SUM(每秒运行中磁盘数)
 static File *shot_file = NULL;       // 快照文件：记录每秒钟所有磁盘的状态
 static File *power_shot_file = NULL; // 记录每秒的磁盘总功耗
@@ -130,6 +133,7 @@ void power_shot() {
         power_shot_init();
     }
     double power = real_total_power();
+    total_real_energy += power;
     power_shot_file->print("%5d", exp_time);   // 写入时间
     power_shot_file->print(",%.1f", power);   // 写入总功率
     power_shot_file->print("\n");
@@ -173,6 +177,9 @@ static void snapshot_init() {
  * 时间    磁盘i的状态    运行中磁盘数    磁盘i的正在读写的文件数    磁盘i的命中指数
  */
 void snapshot() {
+    update_peak_power(ideal_peak_power, ideal_total_power());
+    power_shot();
+
     if (shot_file == NULL) {
         snapshot_init();
     }
@@ -204,10 +211,6 @@ void snapshot() {
         shot_file->print(",%8.2f", data_disk_hit_prob[i]);
     }
     shot_file->print("\n");
-
-    update_peak_power(ideal_peak_power, ideal_total_power());
-
-    power_shot();
 }
 
 /*
@@ -220,23 +223,26 @@ void snapshot_end() {
     power_shot_file = NULL;
 
     int total_start_times = 0;
-    double total_energy = 0.0;
+    double total_ideal_energy = 0.0;
     File disk_stat("./track/disk_stat.txt", "w");
-    disk_stat.print("disk_id,   hit_count,   start_times,     energy\n");
+    disk_stat.print("disk_id,   hit_count,   start_times,   ideal_energy\n");
     for (int i = 0; i < data_disk_num; i++) {
         DiskInfo *disk = data_disk_array[i];
-        disk_stat.print("%7d,   %9d,   %11d,   %8.1f\n",
+        disk_stat.print("%7d,   %9d,   %11d,       %8.1f\n",
                 i, disk->hit_count, disk->start_times, disk->energy);
         total_start_times += disk->start_times;
-        total_energy += disk->energy;
+        total_ideal_energy += disk->energy;
     }
 
     disk_stat.print("\n");
     disk_stat.print("Total start times: %d.\n", total_start_times);
     disk_stat.print("Average start times per disk: %f.\n", 1.0 * total_start_times / data_disk_num);
     disk_stat.print("\n");
-    disk_stat.print("Total energy consumed: %f kJ.\n", total_energy / 1000);
-    disk_stat.print("Average energy consumed per second: %f J.\n", total_energy / exp_time);
+    disk_stat.print("Total ideal energy consumed: %f kJ.\n", total_ideal_energy / 1000);
+    disk_stat.print("Average ideal energy consumed per second: %f J.\n", total_ideal_energy / exp_time);
+    disk_stat.print("\n");
+    disk_stat.print("Total real energy consumed: %f kJ.\n", total_real_energy / 1000);
+    disk_stat.print("Average real energy consumed per second: %f J.\n", total_real_energy / exp_time);
     disk_stat.print("\n");
     disk_stat.print("Average opened disks per second: %f.\n", 1.0 * total_opened / exp_time);
     disk_stat.print("\n");

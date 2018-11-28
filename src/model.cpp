@@ -38,10 +38,20 @@ void update_exp_time() {
     exp_time = now - basic;
 
     if (exp_time % 10 == 0) {
+//        int total_tasks = 0;
         for (int i = 0; i < data_disk_num; ++i) {
             DiskInfo *disk = data_disk_array[i];
+//            total_tasks += (disk->rd_file_list->size() + disk->wt_file_list->size());
             log.debug("[MAIN ] Disk %d: %5d  %5d  %5d", i, disk->file_list->size(), disk->rd_file_list->size(), disk->wt_file_list->size());
         }
+        // 删除系统缓存
+//        if (total_tasks == 0) {
+//            if (system_call("sync; echo 1 > /proc/sys/vm/drop_caches")) {
+//                log.error("[MODEL] Fail to delete cache in memory.");
+//            } else {
+//                log.debug("[MODEL] Cached clear.");
+//            }
+//        }
     }
 }
 
@@ -88,6 +98,10 @@ char *get_file_name(FileInfo *file) {
     time_t2str(file->time, date_time, 20);
     date_time[10] = '_';
     sprintf(name, "%08.4f_%08.4f_%s.fits", file->ra, file->dec, date_time);
+    if (strlen(name) != 42) {
+        delete name;
+        name = NULL;
+    }
     return name;
 }
 
@@ -412,7 +426,9 @@ void data_init() {
     // spin_down 各个磁盘
     for (int i = 0; i < data_disk_num; ++i) {
         data_disk_array[i]->disk_state = 0 - disk_start_time;
-        Disk_Ctl::spin_down_disk(i);
+        if (config.get_int("MAIN", "InitDisk", 1)) {
+            Disk_Ctl::spin_down_disk(i);
+        }
         log.debug("[MODEL] Disk %d prepared!", i);
     }
 }
