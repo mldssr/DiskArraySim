@@ -41,6 +41,14 @@ int main(int argc, char **argv) {
     R_MAP::iterator iter = req_list.begin();
     while((exp_time < max_req_time) || (!time_to_shut_down())) {
         log.pure("           Exp_time: %d\n", exp_time);
+        // 删除系统缓存
+//        if (time_to_clear_cached()) {
+//            if (system_call("sync; echo 1 > /proc/sys/vm/drop_caches")) {
+//                log.error("[MODEL] Fail to delete cache in memory.");
+//            } else {
+//                log.debug("[MODEL] Cached clear.");
+//            }
+//        }
         // 处理这一秒的所有请求
         while (iter->second.gen_time == exp_time) {
             handle_a_req(&iter->second);

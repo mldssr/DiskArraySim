@@ -17,7 +17,7 @@
 
 // 用于处理实际 I/O
 
-typedef struct Args {
+struct Args {
     int id;  // 磁盘编号
 };
 
@@ -35,9 +35,13 @@ void handle_wt(int id) {
     while (iter != disk->wt_file_list->end()) {
         // 传输数据
         FileInfo *file = &iter->second;
-        char *file_name = get_file_name(file);
-        char path[100]; // 足够大，例如 /media/hdd00/fits/332.4060_-56.6292_2016-03-14_17:41:09.fits
-        sprintf(path, "%s%s", dir[id], file_name);
+        char file_name[100];
+        if (get_file_name(file, file_name, sizeof(file_name))) {    // 解析文件名失败
+            log.error("[DISK ] Thread %d: Fail to get file_name.", id);
+            continue;
+        }
+        char path[100] = {0}; // 足够大，例如 /media/hdd00/fits/332.4060_-56.6292_2016-03-14_17:41:09.fits
+        snprintf(path, 100, "%s%s", dir[id], file_name);
 //        log.debug("[DISK ] Thread %d: Going to write %s.", id, path);
         if (is_exist(path)) {   // 文件已存在
             // 索引中不一定存在，还是要将 file 从 wt_list 移动到 file_list
@@ -61,45 +65,60 @@ void handle_wt(int id) {
                 log.error("[DISK ] Thread %d: Fail to delete file in memory.", id);
             }
         }
-        delete file_name;
         iter = disk->wt_file_list->begin();
     }
 }
 
-// 处理读队列
+// 将指定磁盘的读队列处理掉
 // @parm id 磁盘ID
 void handle_rd(int id) {
     DiskInfo *disk = data_disk_array[id];
-    log.debug("[DISK ] Thread %d: Going to handle %d file reads.", id, disk->rd_file_list->size());
-    RW_LIST::iterator iter = disk->rd_file_list->begin();
+    RW_LIST* rd_list = disk->rd_file_list;
+    log.debug("[DISK ] Thread %d: Going to handle %d file reads.", id, rd_list->size());
+
+    log.sublog("--------------------------- disk %d -------- rd_file_list --------------------\n", id);
+    RW_LIST::iterator rd_iter;
+    for (rd_iter = rd_list->begin(); rd_iter != rd_list->end(); ++rd_iter) {
+        show_file(&rd_iter->second);
+    }
+    log.pure("\n");
+
+    RW_LIST::iterator iter = rd_list->begin();
     int count = 0;
-    while (iter != disk->rd_file_list->end()) {
+    while (iter != rd_list->end()) {
         // 传输数据
         FileInfo *file = &iter->second;
-        char *file_name = get_file_name(file);
-        if (!file_name) {
-            log.error("[DISK ] Failed to get file name.");
+        char file_name[100] = {0};
+        int ret = get_file_name(file, file_name, sizeof(file_name));
+        char path[100] = {0}; // 足够大，例如 /media/hdd00/fits/332.4060_-56.6292_2016-03-14_17:41:09.fits
+        snprintf(path, 100, "%s%s", dir[id], file_name);
+        if (ret || !is_exist(path)) {    // 解析文件名失败 或 文件不存在
+            log.error("[DISK ] Thread %d[%d]: Failed to get file name: %s.", id, count, file_name);
             // 将 file 从 rd_list 直接删除
-            hand_over_a_file(iter->second.file_id);
-            disk->rd_file_list->erase(iter);
-            iter = disk->rd_file_list->begin();
-            continue;
+//            hand_over_a_file(iter->second.file_id);
+//            log.error("[DISK ] Thread %d[%d]: After hand_over_a_file()", id, count);
+            show_file(file);
+            rd_list->pop_front();
+            log.error("[DISK ] Thread %d[%d]: After pop_front()", id, count);
+            iter = rd_list->begin();
+//            log.error("[DISK ] Thread %d[%d]: After update iter", id, count);
+            ++count;
+            rd_list->clear();
+            break;
         }
         log.debug("[DISK ] Thread %d[%d]: Going to read file %s.", id, count, file_name);
         if (!system_call("cp %s%s %s", dir[id], file_name, tmp_dir)) { // 读取成功
             log.debug("[DISK ] Thread %d[%d]: Read file success!", id, count);
-            // 将 file 从 rd_list 直接删除
-            hand_over_a_file(iter->second.file_id);
-            disk->rd_file_list->erase(iter);
         } else {
             log.error("[DISK ] Thread %d[%d]: Fail to read file %s.", id, count, file_name);
         }
+        hand_over_a_file(file->file_id);
+        iter = rd_list->erase(iter);    // 将 file 从 rd_list 直接删除
         // 删除拷贝到内存中的文件
         if (system_call("rm -f %s%s", tmp_dir, file_name)) {
             log.error("[DISK ] Thread %d: Fail to delete file in memory.", id);
         }
-        delete file_name;
-        iter = disk->rd_file_list->begin();
+//        iter = rd_list->begin();
         ++count;
     }
 }
@@ -108,11 +127,22 @@ void handle_rd(int id) {
  * 每个磁盘一个线程，用来处理读写队列的任务
  */
 void *io_handler_t(void *_arg) {
-    sleep(2); // 休眠 2 秒
+    sleep(1);
     Args *arg = (Args *)_arg;
     int id = arg->id;
     if (id > 7) {   // 实际只装载了8个磁盘
         return NULL;
+    }
+
+    if (config.get_int("MAIN", "InitDisk", 1)) {
+        system_call("hdparm -B 50 %s", dev[id]);   // 允许磁盘 spin-down
+        int mode = config.get_int("MAIN", "Mode", 0);
+        int idle_th = config.get_int("MAIN", "MaxIdleTime", 60);
+        if (mode == 0) {    // 普通模式
+            system_call("hdparm -S %d %s", idle_th/5, dev[id]);
+        } else {            // DAES
+            system_call("hdparm -S %d %s", idle_th*2/5, dev[id]);
+        }
     }
 
     int max_req_time = config.get_int("REQ", "MaxReqTime", 1000);
@@ -153,17 +183,6 @@ Disk_Ctl::Disk_Ctl() {
         sprintf(dev[i], "/dev/sd%c", 'b'+i);    // 设备名，例如 /dev/sdb
         dir[i] = new char[50]();
         sprintf(dir[i], "/media/hdd0%c/fits/", '0'+i);  // 目录名，例如 /media/hdd00/fits/
-    }
-
-    if (config.get_int("MAIN", "InitDisk", 1)) {
-        system_call("hdparm -B 50 /dev/sd[b-i]");   // 允许磁盘 spin-down
-        int mode = config.get_int("MAIN", "Mode", 0);
-        int idle_th = config.get_int("MAIN", "MaxIdleTime", 60);
-        if (mode == 0) {    // 普通模式
-            system_call("hdparm -S %d /dev/sd[b-i]", idle_th/5);
-        } else {            // DAES
-            system_call("hdparm -S %d /dev/sd[b-i]", idle_th*2/5);
-        }
     }
 
     argss = new Args*[_disk_num];

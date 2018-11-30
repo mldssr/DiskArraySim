@@ -4,9 +4,9 @@
  *  Created on: Nov 17, 2018
  *      Author: lxx
  */
-
 #ifndef SRC_DISK_CTL_H_
 #define SRC_DISK_CTL_H_
+#include "pthread.h"
 
 class Disk_Ctl {
 private:

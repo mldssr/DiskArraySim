@@ -1,7 +1,7 @@
 BUILD := $(PWD)/build/
 CXX ?= g++
 
-CFLAGS := -O3 -Wall -std=c++11 #-std=c++0x
+CFLAGS := -Wall # -O3 -std=c++11 #-std=c++0x
 #INCLUDE := $(shell pkg-config --cflags glib-2.0 openssl zlib)
 #LIBFLAGS := $(shell pkg-config --libs glib-2.0 openssl zlib)
 
@@ -46,7 +46,7 @@ TAPPS := $(basename $(TOBJS))
 .PHONY: all sim test clean
 
 sim: $(APPS)
-	$(BUILD)sim $(PWD)/conf.conf
+#	$(BUILD)sim $(PWD)/conf.conf
 
 $(OBJS) $(AOBJS) $(TOBJS): $(BUILD)%.o : %.cpp
 	@mkdir -p $(dir $@)

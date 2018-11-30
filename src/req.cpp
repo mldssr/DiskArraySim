@@ -5,6 +5,7 @@
  *      Author: lxx
  */
 #include "string.h"
+#include "unistd.h"
 #include <map>
 
 #include "utils/basic.h"

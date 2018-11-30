@@ -84,7 +84,7 @@ struct DiskInfo {
 };
 
 FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t time);
-char *get_file_name(FileInfo *file);
+int get_file_name(FileInfo *file, char *name, size_t size);
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size);
 void del_DiskInfo(DiskInfo *disk);
 
@@ -125,6 +125,7 @@ void update_wt_list(DiskInfo *disk);
 void update_rd_list(DiskInfo *disk);
 
 bool time_to_shut_down();
+
 // 指定磁盘读写队列的任务总数
 int rw_tasks (DiskInfo *disk);
 /*
@@ -134,6 +135,7 @@ void all_disks_after_1s();
 
 extern int exp_time;
 void update_exp_time();
+bool time_to_clear_cached();
 extern int disk_start_time;
 extern int file_id_num;
 extern int data_disk_num;

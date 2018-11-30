@@ -62,15 +62,20 @@ int test_size() {
 
 void test_get_file_name() {
     FileInfo *file0 = new_FileInfo(0, 200, 332.4060, -56.6292, 121);
-    char *name = get_file_name(file0);
-    printf("%s\n", name);
-    delete name;
+    char file_name[100];
+    if (get_file_name(file0, file_name, sizeof(file_name))) {    // 解析文件名失败
+        printf("Error!\n");
+    } else {
+        printf("%s\n", file_name);
+    }
     delete file0;
 
     file0 = new_FileInfo(0, 200, 32.4060, -6.6292, 121);
-    name = get_file_name(file0);
-    printf("%s\n", name);
-    delete name;
+    if (get_file_name(file0, file_name, sizeof(file_name))) {    // 解析文件名失败
+        printf("Error!\n");
+    } else {
+        printf("%s\n", file_name);
+    }
     delete file0;
 }
 

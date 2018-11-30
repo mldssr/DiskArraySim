@@ -17,8 +17,8 @@
 #include "corr.h"
 //#include "model.h"
 
-#define C_MAP    std::map<Key, std::multimap<Stats, Key>>
-#define C_PAIR  std::pair<Key, std::multimap<Stats, Key>>
+#define C_MAP    std::map<Key, std::multimap<Stats, Key> >
+#define C_PAIR  std::pair<Key, std::multimap<Stats, Key> >
 
 // 用来记录被请求的文件，以便从中分析文件相关度 <request_time, Key>
 std::map<int, Key> req_file_map;

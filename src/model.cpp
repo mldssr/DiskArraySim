@@ -55,6 +55,31 @@ void update_exp_time() {
     }
 }
 
+bool time_to_clear_cached() {
+    bool ret = false;
+    if (exp_time % 10 != 0) {
+        return ret;
+    }
+    char buf0[50];
+    if (system_callback(buf0, sizeof(buf0), "free -m | awk 'NR==2 {print $7}'")) {
+        int cached = 0;
+        sscanf(buf0, "%d", &cached);
+        if (cached > 200) { // 缓存过多
+            char buf1[50];
+            if (system_callback(buf1, sizeof(buf1), "find /dev/shm -name \"*.fits\" ! -name \"template_50*.fits\" | wc -l")) {
+                int files = 1;
+                sscanf(buf1, "%d", &files);
+                if (files == 0) {   // 当前没有I/O
+                    ret = true;
+                }
+            }
+        }
+    } else {
+        log.error("[MODEL] Failed to get cached memory.");
+    }
+    return ret;
+}
+
 // 视场的长度与宽度，也是请求天区的长宽
 static int length = 3;
 static int width = 1.5;
@@ -90,19 +115,27 @@ FileInfo *new_FileInfo(int file_id, int file_size, double ra, double dec, time_t
  * 格式：RA_Dec_Date_Time.fits
  * 例如：332.4060_-56.6292_2016-03-14_17:41:09.fits
  *      032.4060_-06.6292_2016-03-14_17:41:09.fits
- * 注：调用者应在用完后及时 delete，避免内存泄露
+ * 需要调用者至少提供 43B 空间
+ * @return 0 - success, -1 - failed
  */
-char *get_file_name(FileInfo *file) {
-    char *name = new char[100]();
-    char date_time[30];
-    time_t2str(file->time, date_time, 20);
-    date_time[10] = '_';
-    sprintf(name, "%08.4f_%08.4f_%s.fits", file->ra, file->dec, date_time);
-    if (strlen(name) != 42) {
-        delete name;
-        name = NULL;
+int get_file_name(FileInfo *file, char *name, size_t size) {
+    if (size <= 43) {
+        return -1;
     }
-    return name;
+    char date_time[40] = {0};
+    time_t2str(file->time, date_time, sizeof(date_time));
+    date_time[10] = '_';
+    if (file->ra < 0.0 || file->ra > 360.0 || file->dec < -90.0 || file->dec > 90.0 || strlen(date_time) != 19) {
+        log.error("[MODEL] Wrong file: ra: %f,  dec: %f,  time: %s.", file->ra, file->dec, date_time);
+        return -1;
+    }
+    char buf[100];
+    if (snprintf(buf, 100, "%08.4f_%08.4f_%s.fits", file->ra, file->dec, date_time) != 42) {
+        log.error("[MODEL] Wrong convert: file_name: %s.", name);
+        return -1;
+    }
+    snprintf(name, 43, "%s", buf);
+    return 0;
 }
 
 DiskInfo *new_DiskInfo(int disk_id, int disk_state, int disk_size) {
@@ -611,9 +644,9 @@ int handle_a_req(Req *req) {
             break;
         MAP*file_list = disk->file_list;
         // 找到磁盘中符合条件的文件的上界和下界
-        Key key0 { req->ra - length, req->dec - width, end };
+        Key key0(req->ra - length, req->dec - width, end);
         MAP::iterator iter_low = file_list->upper_bound(key0);
-        Key key1 { req->ra + length, req->dec + width, start };
+        Key key1(req->ra + length, req->dec + width, start);
         MAP::iterator iter_up = file_list->lower_bound(key1);
 
         int total_search = 0;               // 记录本磁盘检查的 file 数
@@ -696,7 +729,7 @@ int handle_a_req(Req *req) {
 void show_file(FileInfo *file) {
     char buf[20];
     time_t2str(file->time, buf, sizeof(buf));
-    log.sublog("[File ] file_id %6d   file_size %d   ra %9.4f   dec %9.4f   time %s   hit_count %d\n",
+    log.sublog("[File ] id %6d   size %d   ra %9.4f   dec %9.4f   time %s   hit_count %d\n",
             file->file_id, file->file_size, file->ra, file->dec, buf, file->hit_count);
 }
 
