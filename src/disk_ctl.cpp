@@ -6,6 +6,7 @@
  */
 #include "pthread.h"
 #include "unistd.h"
+#include <stdio.h>
 
 #include "utils/basic.h"
 #include "utils/file.h"
@@ -69,6 +70,36 @@ void handle_wt(int id) {
     }
 }
 
+int read_file(const int id, const char *path) {
+    FILE *fp = fopen(path, "rb");
+    if (fp == NULL) {
+        log.error("[DISK ] Thread %d: Failed to open file %s.", id, path);
+        return -1;
+    }
+    log.debug("[DISK ] Thread %d   : Open file %s.", id, path);
+    int file_size = config.get_int("DATA", "FileSize", 200);
+    char buffer[1025];  // 1024 also OK
+    for (int i = 0; i < file_size - 1; ++i) {
+        for (int j = 0; j < 1024; ++j) {
+            fread(buffer, 1024, 1, fp);
+        }
+    }
+    log.debug("[DISK ] Thread %d   : Close file.", id);
+    fclose(fp);
+//    File file(path, "rb");
+//    if (file.is_null()) {
+//        return -1;
+//    }
+//    int file_size = config.get_int("DATA", "FileSize", 200);
+//    char buffer[1025];  // 1024 also OK
+//    for (int i = 0; i < file_size - 1; ++i) {
+//        for (int j = 0; j < 1024; ++j) {
+//            file.read(buffer, 1024, 1);
+//        }
+//    }
+    return 0;
+}
+
 // 将指定磁盘的读队列处理掉
 // @parm id 磁盘ID
 void handle_rd(int id) {
@@ -107,7 +138,11 @@ void handle_rd(int id) {
             break;
         }
         log.debug("[DISK ] Thread %d[%d]: Going to read file %s.", id, count, file_name);
-        if (!system_call("cp %s%s %s", dir[id], file_name, tmp_dir)) { // 读取成功
+//        char t_dir[100] = {0};
+//        snprintf(t_dir, 100, "/media/hdd0%d/", id);
+//        char t_file[100] = "haha.fits";
+//        gen_file(t_dir, t_file);
+        if (!read_file(id, path)) { // 读取成功 !read_file(path)  !sleep(1)
             log.debug("[DISK ] Thread %d[%d]: Read file success!", id, count);
         } else {
             log.error("[DISK ] Thread %d[%d]: Fail to read file %s.", id, count, file_name);
@@ -115,12 +150,13 @@ void handle_rd(int id) {
         hand_over_a_file(file->file_id);
         iter = rd_list->erase(iter);    // 将 file 从 rd_list 直接删除
         // 删除拷贝到内存中的文件
-        if (system_call("rm -f %s%s", tmp_dir, file_name)) {
-            log.error("[DISK ] Thread %d: Fail to delete file in memory.", id);
-        }
+//        if (system_call("rm -f %s%s", tmp_dir, file_name)) {
+//            log.error("[DISK ] Thread %d: Fail to delete file in memory.", id);
+//        }
 //        iter = rd_list->begin();
         ++count;
     }
+    log.debug("[DISK ] Thread %d: Totally read %d files!", id, count);
 }
 
 /*
