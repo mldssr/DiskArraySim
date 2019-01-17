@@ -37,13 +37,13 @@ void update_exp_time() {
     pre = now;
     exp_time = now - basic;
 
-    if (exp_time % 10 == 0) {
+//    if (exp_time % 10 == 0) {
 //        int total_tasks = 0;
-        for (int i = 0; i < data_disk_num; ++i) {
-            DiskInfo *disk = data_disk_array[i];
+//        for (int i = 0; i < data_disk_num; ++i) {
+//            DiskInfo *disk = data_disk_array[i];
 //            total_tasks += (disk->rd_file_list->size() + disk->wt_file_list->size());
-            log.debug("[MAIN ] Disk %d: %5d  %5d  %5d", i, disk->file_list->size(), disk->rd_file_list->size(), disk->wt_file_list->size());
-        }
+//            log.debug("[MAIN ] Disk %d: %5d  %5d  %5d", i, disk->file_list->size(), disk->rd_file_list->size(), disk->wt_file_list->size());
+//        }
         // 删除系统缓存
 //        if (total_tasks == 0) {
 //            if (system_call("sync; echo 1 > /proc/sys/vm/drop_caches")) {
@@ -52,7 +52,7 @@ void update_exp_time() {
 //                log.debug("[MODEL] Cached clear.");
 //            }
 //        }
-    }
+//    }
 }
 
 bool time_to_clear_cached() {

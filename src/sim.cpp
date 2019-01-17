@@ -49,8 +49,12 @@ int main(int argc, char **argv) {
 //                log.debug("[MODEL] Cached clear.");
 //            }
 //        }
+        // 以防有请求被卡住
+        while (iter != req_list.end() && iter->second.gen_time < exp_time) {
+            ++iter;
+        }
         // 处理这一秒的所有请求
-        while (iter->second.gen_time == exp_time) {
+        while (iter != req_list.end() && iter->second.gen_time == exp_time) {
             handle_a_req(&iter->second);
             iter++;
             if (iter != req_list.end()) {

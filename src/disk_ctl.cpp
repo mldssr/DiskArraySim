@@ -107,12 +107,12 @@ void handle_rd(int id) {
     RW_LIST* rd_list = disk->rd_file_list;
     log.debug("[DISK ] Thread %d: Going to handle %d file reads.", id, rd_list->size());
 
-    log.sublog("--------------------------- disk %d -------- rd_file_list --------------------\n", id);
-    RW_LIST::iterator rd_iter;
-    for (rd_iter = rd_list->begin(); rd_iter != rd_list->end(); ++rd_iter) {
-        show_file(&rd_iter->second);
-    }
-    log.pure("\n");
+//    log.sublog("--------------------------- disk %d -------- rd_file_list --------------------\n", id);
+//    RW_LIST::iterator rd_iter;
+//    for (rd_iter = rd_list->begin(); rd_iter != rd_list->end(); ++rd_iter) {
+//        show_file(&rd_iter->second);
+//    }
+//    log.pure("\n");
 
     RW_LIST::iterator iter = rd_list->begin();
     int count = 0;
@@ -137,12 +137,12 @@ void handle_rd(int id) {
             rd_list->clear();
             break;
         }
-        log.debug("[DISK ] Thread %d[%d]: Going to read file %s.", id, count, file_name);
+//        log.debug("[DISK ] Thread %d[%d]: Going to read file %s.", id, count, file_name);
 //        char t_dir[100] = {0};
 //        snprintf(t_dir, 100, "/media/hdd0%d/", id);
 //        char t_file[100] = "haha.fits";
 //        gen_file(t_dir, t_file);
-        if (!read_file(id, path)) { // 读取成功 !read_file(path)  !sleep(1)
+        if (!sleep(1)) { // 读取成功 !read_file(id, path)  !sleep(1)
             log.debug("[DISK ] Thread %d[%d]: Read file success!", id, count);
         } else {
             log.error("[DISK ] Thread %d[%d]: Fail to read file %s.", id, count, file_name);
